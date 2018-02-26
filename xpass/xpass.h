@@ -23,6 +23,12 @@ typedef enum XPASS_RECV_STATE_ {
   XPASS_RECV_NSTATE,
 } XPASS_RECV_STATE;
 
+typedef enum XPASS_CREDIT_FEEDBACK_CONTROL_ {
+  XPASS_CREDIT_LEGACY,
+  XPASS_CREDIT_BIC,
+  XPASS_CREDIT_CUBIC,
+} XPASS_CREDIT_FEEDBACK_CONTROL;
+
 struct hdr_xpass {
   // To measure RTT  
   double credit_sent_time_;
@@ -87,6 +93,9 @@ public:
                 sender_retransmit_timer_(this), receiver_retransmit_timer_(this),
                 curseq_(1), t_seqno_(1), recv_next_(1),
                 c_seqno_(1), c_recv_next_(1), rtt_(-0.0),
+                bic_target_loss_(0.1), bic_increase_rate_(0.1), bic_target_rate_(0.0)
+                bic_prev_credit_rate_(0.0);
+                credit_feedback_control_(XPASS_CREDIT_BIC);
                 credit_recved_(0), wait_retransmission_(false) { }
   virtual int command(int argc, const char*const* argv);
   virtual void recv(Packet*, Handler*);
@@ -98,6 +107,8 @@ protected:
   XPASS_SEND_STATE credit_send_state_;
   // credit receive state
   XPASS_RECV_STATE credit_recv_state_;
+  // credit feedback control mode
+  XPASS_CREDIT_FEEDBACK_CONTROL credit_feedback_control_;
 
   // minimum Ethernet frame size (= size of control packet such as credit)
   int min_ethernet_size_;
@@ -181,6 +192,12 @@ protected:
   // whether receiver is waiting for data retransmission
   bool wait_retransmission_;
 
+  /* BIC */
+  double bic_target_loss_;
+  double bic_increase_rate_;
+  double bic_target_rate_;
+  double bic_prev_credit_rate_;
+
   inline double now() { return Scheduler::instance().clock(); }
   seq_t datalen_remaining() { return (curseq_ - t_seqno_); }
   double avg_credit_size() { return (min_credit_size_ + max_credit_size_)/2.0; }
@@ -207,6 +224,8 @@ protected:
   void update_rtt(Packet *pkt);
 
   void credit_feedback_control();
+  void credit_feedback_control_legacy(); 
+  void credit_feedback_control_bic();
 };
 
 #endif
