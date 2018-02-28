@@ -93,9 +93,9 @@ public:
                 sender_retransmit_timer_(this), receiver_retransmit_timer_(this),
                 curseq_(1), t_seqno_(1), recv_next_(1),
                 c_seqno_(1), c_recv_next_(1), rtt_(-0.0),
-                bic_target_loss_(0.1), bic_increase_rate_(0.1), bic_target_rate_(0.0)
-                bic_prev_credit_rate_(0.0);
-                credit_feedback_control_(XPASS_CREDIT_BIC);
+                bic_target_loss_(0.03), bic_increase_rate_(0.5), bic_target_rate_(0), bic_exp_base_(100), bic_exp_current_(0),
+                bic_prev_credit_rate_(0), bic_s_min_(100000), bic_s_max_(1000000),
+                credit_feedback_control_(XPASS_CREDIT_BIC),
                 credit_recved_(0), wait_retransmission_(false) { }
   virtual int command(int argc, const char*const* argv);
   virtual void recv(Packet*, Handler*);
@@ -195,9 +195,12 @@ protected:
   /* BIC */
   double bic_target_loss_;
   double bic_increase_rate_;
-  double bic_target_rate_;
-  double bic_prev_credit_rate_;
-
+  int bic_target_rate_;
+  int bic_prev_credit_rate_;
+  int bic_s_min_;
+  int bic_s_max_;
+  int bic_exp_base_;
+  int bic_exp_current_;
   inline double now() { return Scheduler::instance().clock(); }
   seq_t datalen_remaining() { return (curseq_ - t_seqno_); }
   double avg_credit_size() { return (min_credit_size_ + max_credit_size_)/2.0; }

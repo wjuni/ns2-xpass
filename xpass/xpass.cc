@@ -1,6 +1,8 @@
 #include "xpass.h"
 #include "../tcp/template.h"
-
+#define ABS(a) ((a) >= 0 ? (a) : -(a))
+#define UPDATE_WITH_LIMIT(target, value, minval, maxval) target = (ABS((target)-(value))>(maxval)? (((target) > (value)) ? (target)-(maxval) : (target) + (maxval) ) : (ABS((target)-(value)) < (minval) ? \
+     ( ((target) > (value)) ? (target)-(minval) : (target)+(minval) ) : (value)))
 int hdr_xpass::offset_;
 static class XPassHeaderClass: public PacketHeaderClass {
 public:
@@ -109,7 +111,8 @@ int XPassAgent::delay_bind_dispatch(const char *varName, const char *localName,
 
 void XPassAgent::init() {
   w_ = w_init_;
-  cur_credit_rate_ = (int)(alpha_ * max_credit_rate_);
+  cur_credit_rate_ = (int)(alpha_ * max_credit_rate_); //(int)(alpha_ * 64734895);//(int)(alpha_ * max_credit_rate_);
+  bic_target_rate_ = 0.5 * 64734895;
   last_credit_rate_update_ = now();
 }
 
@@ -557,7 +560,7 @@ void XPassAgent::credit_feedback_control_legacy() {
 }
 
 void XPassAgent::credit_feedback_control_bic() {
-  double prev_credit_rate = cur_credit_rate;
+  int old_rate = cur_credit_rate_;
   if (rtt_ <= 0.0) {
     return;
   }
@@ -568,75 +571,87 @@ void XPassAgent::credit_feedback_control_bic() {
     return;
   }
 
-  int old_rate = cur_credit_rate_;
   double loss_rate = credit_dropped_/(double)credit_total_;
   int min_rate = (int)(avg_credit_size() / rtt_);
-
-  if (loss_rate > bic_target_loss_) {
+  double data_received_rate = 0;
+   
+  if (loss_rate > bic_target_loss_){
     // congestion has been detected!
-    double data_received_rate;
     if (loss_rate >= 1.0) {
       data_received_rate = (int)(avg_credit_size() / rtt_);
     } else {
       data_received_rate = (int)(avg_credit_size()*(credit_total_ - credit_dropped_)
-                         / (now() - last_credit_rate_update_)
-                         * (1.0+target_loss));
+                         / (now() - last_credit_rate_update_));
     }
     if (bic_prev_credit_rate_ <= bic_target_rate_) {
       // normal situation
-      bic_target_rate_ = bic_prev_credit_rate_;
-      printf("CFC : dec, reverting target=%lf\n", bic_target_rate_);
+  //    bic_target_rate_ = bic_prev_credit_rate_;
+      
+     //  bic_target_rate_ = data_received_rate;
+     
+     UPDATE_WITH_LIMIT(bic_target_rate_, bic_prev_credit_rate_, bic_s_min_, bic_s_max_);
+      printf("CFC : dec, reverting target=%d (%d)\n", bic_target_rate_, max_credit_rate_);
     } else {
       // double loss
-      bic_target_rate_ = data_received_rate;
-      printf("CFC : dec, using data rate target=%lf\n", bic_target_rate_);
+//    bic_target_rate_ = data_received_rate;
+      //UPDATE_WITH_LIMIT(bic_target_rate_, data_received_rate, bic_s_min_, bic_s_max_);
+      printf("CFC : dec, using data rate target=%d (%d)\n", bic_target_rate_, max_credit_rate_);
     }
 
+  //  bic_target_rate_ = (bic_target_rate_ + data_received_rate) / 2;
 
-    bic_target_rate_ = bic_prev_credit_rate_:
-    if (bic_target_rate_ >= data_received_rate) {
-      cur_credit_rate_ = data_received_rate;
-      printf("CFC : dec, rate=%lf\n", cur_credit_rate_);
+    if (cur_credit_rate_ > data_received_rate) {
+      UPDATE_WITH_LIMIT(cur_credit_rate_, (cur_credit_rate_ + bic_target_rate_)/2, bic_s_min_, bic_s_max_);
+      printf("CFC : dec, rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
     } else {
-      cur_credit_rate_ = bic_target_rate_;
-      printf("CFC : dec, (fit_target) rate=%lf\n", cur_credit_rate_);
+      printf("CFC : dec, (fit_target) rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
     }
+    bic_exp_current_ = bic_exp_base_;
   
   } else {
     // there is no congestion.
     if (bic_target_rate_ - cur_credit_rate_ <= 0.05 * bic_target_rate_) {
       // exponential
-      cur_credit_rate_ *= (1.0 + bic_increase_rate_);
-      printf("CFC : exp inc, rate=%lf\n", cur_credit_rate_);
+      if(cur_credit_rate_ < bic_target_rate_) {
+        bic_exp_current_ = bic_exp_base_;
+        UPDATE_WITH_LIMIT(cur_credit_rate_, bic_target_rate_, bic_s_min_, bic_s_max_);
+      } else {
+        int new_rate = cur_credit_rate_ + (cur_credit_rate_ - bic_target_rate_) * (1.0+bic_increase_rate_);
+        UPDATE_WITH_LIMIT(cur_credit_rate_, new_rate, bic_s_min_, bic_s_max_);
+      }
+     //cur_credit_rate_ *= (1.0 + bic_increase_rate_);
+      printf("CFC : exp inc, rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
     } else {
       // binary
-      cur_credit_rate_ = (cur_credit_rate_ + bic_target_rate_) / 2.;
-      printf("CFC : bin inc, rate=%lf\n", cur_credit_rate_);
+      UPDATE_WITH_LIMIT(cur_credit_rate_, (cur_credit_rate_ + bic_target_rate_) / 2., bic_s_min_, bic_s_max_);
+      //cur_credit_rate_ = (cur_credit_rate_ + bic_target_rate_) / 2.;
+      printf("CFC : bin inc, rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
     }
   }
 
   if (cur_credit_rate_ > max_credit_rate_) {
     cur_credit_rate_ = max_credit_rate_;
+    printf("CFC : Max Credit Rate, modifying to %d (%d)\n", cur_credit_rate_, max_credit_rate_);
   }
   if (cur_credit_rate_ < min_rate) {
     cur_credit_rate_ = min_rate;
   }
-
+  printf("CFCS : Crate%9d->%9d\tTrate%9d\tDATA %9.0lf\tLrate%5.2lf%%\tPrCrate %d\t(%d)\n", old_rate, cur_credit_rate_, bic_target_rate_, data_received_rate, loss_rate*100., bic_prev_credit_rate_, max_credit_rate_);
   credit_total_ = 0;
   credit_dropped_ = 0;
   last_credit_rate_update_ = now();
-  bic_prev_credit_rate_ = prev_credit_rate;
+  bic_prev_credit_rate_ = old_rate;
 }
 
 void XPassAgent::credit_feedback_control() {
   switch(credit_feedback_control_) {
-    case XPASS_CREDIT_LEGACY_:
+    case XPASS_CREDIT_LEGACY:
       credit_feedback_control_legacy();
       break;
-    case XPASS_CREDIT_BIC_:
+    case XPASS_CREDIT_BIC:
       credit_feedback_control_bic();
       break;
-    case XPASS_CREDIT_CUBIC_:
+    case XPASS_CREDIT_CUBIC:
       break;
   }
 }
