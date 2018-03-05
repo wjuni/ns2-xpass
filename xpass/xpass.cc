@@ -112,7 +112,7 @@ int XPassAgent::delay_bind_dispatch(const char *varName, const char *localName,
 void XPassAgent::init() {
   w_ = w_init_;
   cur_credit_rate_ = (int)(alpha_ * 64734895);//(int)(alpha_ * max_credit_rate_);
-  bic_target_rate_ = 0.5 * 64734895;
+  bic_target_rate_ =  64734895/2;//128;
   last_credit_rate_update_ = now();
 }
 
@@ -594,18 +594,18 @@ void XPassAgent::credit_feedback_control_bic() {
     } else {
       // double loss
 //    bic_target_rate_ = data_received_rate;
-      //UPDATE_WITH_LIMIT(bic_target_rate_, data_received_rate, bic_s_min_, bic_s_max_);
+   //   UPDATE_WITH_LIMIT(bic_target_rate_, data_received_rate, bic_s_min_, bic_s_max_);
       printf("CFC : dec, using data rate target=%d (%d)\n", bic_target_rate_, max_credit_rate_);
     }
 
   //  bic_target_rate_ = (bic_target_rate_ + data_received_rate) / 2;
 
-    if (cur_credit_rate_ > data_received_rate) {
-      UPDATE_WITH_LIMIT(cur_credit_rate_, (cur_credit_rate_ + bic_target_rate_)/2, bic_s_min_, bic_s_max_);
+  //  if (cur_credit_rate_ > data_received_rate) {
+      UPDATE_WITH_LIMIT(cur_credit_rate_, (bic_target_rate_ + cur_credit_rate_)/2, bic_s_min_, bic_s_max_);
       printf("CFC : dec, rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
-    } else {
-      printf("CFC : dec, (fit_target) rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
-    }
+ //   } else {
+  //    printf("CFC : dec, (fit_target) rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
+  //  }
     //bic_exp_current_ = bic_exp_base_;
   
   } else {
