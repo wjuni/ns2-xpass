@@ -590,12 +590,12 @@ void XPassAgent::credit_feedback_control_bic() {
      //  bic_target_rate_ = data_received_rate;
      
      UPDATE_WITH_LIMIT(bic_target_rate_, bic_prev_credit_rate_, bic_s_min_, bic_s_max_);
-      printf("CFC : dec, reverting target=%d (%d)\n", bic_target_rate_, max_credit_rate_);
+     // printf("CFC : dec, reverting target=%d (%d)\n", bic_target_rate_, max_credit_rate_);
     } else {
       // double loss
 //    bic_target_rate_ = data_received_rate;
       UPDATE_WITH_LIMIT(bic_target_rate_, data_received_rate, bic_s_min_, bic_s_max_);
-      printf("CFC : dec, using data rate target=%d (%d)\n", bic_target_rate_, max_credit_rate_);
+     // printf("CFC : dec, using data rate target=%d (%d)\n", bic_target_rate_, max_credit_rate_);
     }
 
   //  bic_target_rate_ = (bic_target_rate_ + data_received_rate) / 2;
@@ -605,7 +605,7 @@ void XPassAgent::credit_feedback_control_bic() {
     //  printf("CFC : dec, rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
    // } else {
       UPDATE_WITH_LIMIT(cur_credit_rate_, (bic_target_rate_ + cur_credit_rate_)/2 , bic_s_min_, bic_s_max_);
-      printf("CFC : dec, (fit_target) rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
+     // printf("CFC : dec, (fit_target) rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
    // }
   
   } else {
@@ -620,23 +620,23 @@ void XPassAgent::credit_feedback_control_bic() {
         UPDATE_WITH_LIMIT(cur_credit_rate_, new_rate, bic_s_min_, bic_s_max_);
       }
      //cur_credit_rate_ *= (1.0 + bic_increase_rate_);
-      printf("CFC : exp inc, rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
+     // printf("CFC : exp inc, rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
     } else {
       // binary
       UPDATE_WITH_LIMIT(cur_credit_rate_, (cur_credit_rate_ + bic_target_rate_)/2 , bic_s_min_, bic_s_max_);
       //cur_credit_rate_ = (cur_credit_rate_ + bic_target_rate_) / 2.;
-      printf("CFC : bin inc, rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
+     // printf("CFC : bin inc, rate=%d (%d)\n", cur_credit_rate_, max_credit_rate_);
     }
   }
 
   if (cur_credit_rate_ > max_credit_rate_) {
     cur_credit_rate_ = max_credit_rate_;
-    printf("CFC : Max Credit Rate, modifying to %d (%d)\n", cur_credit_rate_, max_credit_rate_);
+   // printf("CFC : Max Credit Rate, modifying to %d (%d)\n", cur_credit_rate_, max_credit_rate_);
   }
   if (cur_credit_rate_ < min_rate) {
     cur_credit_rate_ = min_rate;
   }
-  printf("CFCS : Crate%9d->%9d\tTrate%9d\tDATA %9.0lf\tLrate%5.2lf%%\tPrCrate %d\t(%d)\n", old_rate, cur_credit_rate_, bic_target_rate_, data_received_rate, loss_rate*100., bic_prev_credit_rate_, max_credit_rate_);
+ // printf("CFCS : Crate%9d->%9d\tTrate%9d\tDATA %9.0lf\tLrate%5.2lf%%\tPrCrate %d\t(%d)\n", old_rate, cur_credit_rate_, bic_target_rate_, data_received_rate, loss_rate*100., bic_prev_credit_rate_, max_credit_rate_);
   credit_total_ = 0;
   credit_dropped_ = 0;
   last_credit_rate_update_ = now();
