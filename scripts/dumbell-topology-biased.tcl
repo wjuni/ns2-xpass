@@ -1,12 +1,12 @@
 set ns [new Simulator]
 
 # Configurations
-set N 256
-
+set N 2
 set ALPHA 0.5
 set w_init 0.5
 set linkBW 10Gb
 set inputlinkBW 10Gb
+set inputlinkBW2 40Gb
 set linkLatency 10us
 set creditQueueCapacity [expr 84*2]  ;# bytes
 set dataQueueCapacity [expr 1538*100] ;# bytes
@@ -52,20 +52,28 @@ Queue/XPassDropTail set data_limit_ $dataQueueCapacity
 Queue/XPassDropTail set token_refresh_rate_ $creditRate
 
 for {set i 0} {$i < $N} {incr i} {
-  $ns simplex-link $left_node($i) $left_gateway $inputlinkBW $linkLatency DropTail
-  $ns simplex-link $left_gateway $left_node($i) $inputlinkBW $linkLatency XPassDropTail
+  if {$i % 2} {
+    $ns simplex-link $left_node($i) $left_gateway $inputlinkBW $linkLatency DropTail
+    $ns simplex-link $left_gateway $left_node($i) $inputlinkBW $linkLatency XPassDropTail
 
-  $ns simplex-link $right_node($i) $right_gateway $inputlinkBW $linkLatency DropTail
-  $ns simplex-link $right_gateway $right_node($i) $inputlinkBW $linkLatency XPassDropTail
+    $ns simplex-link $right_node($i) $right_gateway $inputlinkBW $linkLatency DropTail
+    $ns simplex-link $right_gateway $right_node($i) $inputlinkBW $linkLatency XPassDropTail
+  } else {
+    $ns simplex-link $left_node($i) $left_gateway $inputlinkBW2 $linkLatency DropTail
+    $ns simplex-link $left_gateway $left_node($i) $inputlinkBW2 $linkLatency XPassDropTail
+
+    $ns simplex-link $right_node($i) $right_gateway $inputlinkBW2 $linkLatency DropTail
+    $ns simplex-link $right_gateway $right_node($i) $inputlinkBW2 $linkLatency XPassDropTail
+  }
 }
 
 $ns duplex-link $left_gateway $right_gateway $linkBW $linkLatency XPassDropTail
 #$ns trace-queue $left_gateway $right_gateway $nt
 
 puts "Creating Agents..."
-Agent/XPass set max_credit_rate_ $creditRate
+#Agent/XPass set max_credit_rate_ $creditRate
 Agent/XPass set cur_credit_rate_ [expr $ALPHA*$creditRate]
-Agent/XPass set w_ $w_init
+# Agent/XPass set w_ $w_init
 
 for {set i 0} {$i < $N} {incr i} {
   set sender($i) [new Agent/XPass]
@@ -73,7 +81,13 @@ for {set i 0} {$i < $N} {incr i} {
 
   $ns attach-agent $left_node($i) $sender($i)
   $ns attach-agent $right_node($i) $receiver($i)
-
+  if {$i % 2} {
+    $sender($i) set max_credit_rate_ $creditRate 
+    $receiver($i) set max_credit_rate_ $creditRate 
+  } else {
+    $sender($i) set max_credit_rate_ [expr $creditRate *4]
+    $receiver($i) set max_credit_rate_ [expr $creditRate *4]
+  }
   $sender($i) set fid_ [expr $i]
   $receiver($i) set fid_ [expr $i]
 
@@ -82,10 +96,15 @@ for {set i 0} {$i < $N} {incr i} {
 
 puts "Simulation started."
 set nextTime 0.0
+set nextTime2 [expr $nextTime + 0.01]
 for {set i 0} {$i < $N} {incr i} {
-  $ns at $nextTime "$sender($i) advance-bytes 100000000"
+  if {$i % 2} {
+    $ns at $nextTime "$sender($i) advance-bytes 100000000"
+  } else {
+    $ns at $nextTime2 "$sender($i) advance-bytes 100000000"
+  }
   set nextTime [expr $nextTime + $interFlowDelay]
 }
 
-$ns at 100.0 "finish"
+$ns at 10.0 "finish"
 $ns run

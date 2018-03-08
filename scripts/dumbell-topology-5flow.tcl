@@ -1,7 +1,7 @@
 set ns [new Simulator]
 
 # Configurations
-set N 256
+set N 2
 
 set ALPHA 0.5
 set w_init 0.5
@@ -13,7 +13,7 @@ set dataQueueCapacity [expr 1538*100] ;# bytes
 set hostQueueCapacity [expr 1538*100] ;# bytes
 set maxCrditBurst [expr 84*2] ;# bytes
 set creditRate 64734895 ;# bytes / sec
-set interFlowDelay 0 ;# secs
+set interFlowDelay 0.2 ;# secs
 
 # Output file
 file mkdir "outputs"
@@ -82,9 +82,12 @@ for {set i 0} {$i < $N} {incr i} {
 
 puts "Simulation started."
 set nextTime 0.0
+set init_size 10000000
+set dec_size   5000000
 for {set i 0} {$i < $N} {incr i} {
-  $ns at $nextTime "$sender($i) advance-bytes 100000000"
+  $ns at $nextTime "$sender($i) advance-bytes $init_size"
   set nextTime [expr $nextTime + $interFlowDelay]
+  set init_size [expr $init_size - $dec_size]
 }
 
 $ns at 100.0 "finish"
