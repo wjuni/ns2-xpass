@@ -495,8 +495,9 @@ void XPassAgent::process_ack(Packet *pkt) {
       wait_retransmission_ = false;
       receiver_retransmit_timer_.force_cancel();
     }
-    recv_next_ += datalen;
-  }
+		recv_next_ += datalen;
+  	fprintf(stderr,"Set recv_next to %ld, datalen=%ld\n", recv_next_, datalen);
+	}
 }
 
 void XPassAgent::update_rtt(Packet *pkt) {

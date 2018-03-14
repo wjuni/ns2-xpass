@@ -91,13 +91,13 @@ Packet* XPassDropTail::deque() {
 	if(current_q_no_ >= queue_cnt_)
 		current_q_no_ = 0;
 	PacketQueue *current_q = credit_q_[current_q_no_];
-
-  packet = current_q->head();
+packet = current_q->head();
   if (packet && tokens_ >= hdr_cmn::access(packet)->size()) {
-    // Credit packet should be forwarded.
+ 	fprintf(stderr, "Deque from queue=%d\n", current_q_no_);
+     // Credit packet should be forwarded.
     packet = current_q->deque();
     tokens_ -= hdr_cmn::access(packet)->size();
-    return packet;
+		return packet;
   }
   
   // Data packet
