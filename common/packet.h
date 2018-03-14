@@ -657,6 +657,9 @@ struct hdr_cmn {
 	double txtime_;
 	inline double& txtime() { return(txtime_); }
 
+	int cos_; // for CoS Randomization 
+	inline int& cos() { return (cos_); }
+		
 	static int offset_;	// offset for this header
 	inline static int& offset() { return offset_; }
 	inline static hdr_cmn* access(const Packet* p) {

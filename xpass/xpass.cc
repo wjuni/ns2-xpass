@@ -1,5 +1,7 @@
 #include "xpass.h"
 #include "../tcp/template.h"
+#include <cstdlib>
+#include <ctime>
 
 int hdr_xpass::offset_;
 static class XPassHeaderClass: public PacketHeaderClass {
@@ -111,6 +113,7 @@ void XPassAgent::init() {
   w_ = w_init_;
   cur_credit_rate_ = (int)(alpha_ * max_credit_rate_);
   last_credit_rate_update_ = now();
+	srand((unsigned int) time(NULL));
 }
 
 int XPassAgent::command(int argc, const char*const* argv) {
@@ -215,8 +218,13 @@ void XPassAgent::recv_data(Packet *pkt) {
   if (distance < 0) {
     // credit packet reordering or credit sequence number overflow happend.
     fprintf(stderr, "ERROR: Credit Sequence number is reverted.\n");
-    exit(1);
-  }
+     fprintf(stderr, "REVERT: expected >=%d, got %d.\n",  c_recv_next_, xph->credit_seq() );
+   // exit(1);
+ 		process_ack(pkt);
+  update_rtt(pkt);
+
+} else {
+	fprintf(stderr, "NORMAL: expected >=%d, got %d.\n", c_recv_next_, xph->credit_seq());
   credit_total_ += (distance + 1);
   credit_dropped_ += distance;
 
@@ -224,8 +232,9 @@ void XPassAgent::recv_data(Packet *pkt) {
 
   process_ack(pkt);
   update_rtt(pkt);
-}
 
+	}
+}
 void XPassAgent::recv_nack(Packet *pkt) {
   hdr_tcp *tcph = hdr_tcp::access(pkt);
   switch (credit_recv_state_) {
@@ -354,6 +363,7 @@ Packet* XPassAgent::construct_credit() {
 
   cmnh->size() = credit_size;
   cmnh->ptype() = PT_XPASS_CREDIT;
+	cmnh->cos() = rand();
 
   xph->credit_sent_time() = now();
   xph->credit_seq() = c_seqno_;

@@ -269,6 +269,7 @@ Queue/XPassDropTail set credit_limit_ [expr 84*10]
 Queue/XPassDropTail set data_limit_ [expr 1538*100]
 Queue/XPassDropTail set max_tokens_ [expr 84*10]
 Queue/XPassDropTail set token_refresh_rate_ 64734895
+Queue/XPassDropTail set queue_cnt_ 8 
 
 Queue/CBQ set algorithm_ 0 ;# used by compat only, not bound
 Queue/CBQ set maxpkt_ 1024

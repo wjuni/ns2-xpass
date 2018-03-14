@@ -57,9 +57,14 @@ void XPassDropTail::enque(Packet* p) {
   // enqueue packet: store and forward.
   if (cmnh->ptype() == PT_XPASS_CREDIT) {
     // p is credit packet.
-    credit_q_->enque(p);
-    if (credit_q_->byteLength() > credit_q_limit_) {
-      credit_q_->remove(p);
+		// cos randomization
+		assert(queue_cnt_ >= 1);
+		int cos = cmnh->cos();
+		//printf("COS=%d, processing at q=%d (q_cnt_=%d)\n", cos, cos % queue_cnt_, queue_cnt_);	
+		PacketQueue *q = credit_q_[cos % queue_cnt_];
+    q->enque(p);
+    if (q->byteLength() > credit_q_limit_) {
+      q->remove(p);
       drop(p);
     }
   }else {
@@ -82,10 +87,15 @@ Packet* XPassDropTail::deque() {
   updateTokenBucket();
 
   // Credit packet
-  packet = credit_q_->head();
+	current_q_no_ = current_q_no_ + 1;
+	if(current_q_no_ >= queue_cnt_)
+		current_q_no_ = 0;
+	PacketQueue *current_q = credit_q_[current_q_no_];
+
+  packet = current_q->head();
   if (packet && tokens_ >= hdr_cmn::access(packet)->size()) {
     // Credit packet should be forwarded.
-    packet = credit_q_->deque();
+    packet = current_q->deque();
     tokens_ -= hdr_cmn::access(packet)->size();
     return packet;
   }
@@ -102,7 +112,7 @@ Packet* XPassDropTail::deque() {
   if (packet) {
     double delay = (hdr_cmn::access(packet)->size() - tokens_) / token_refresh_rate_;
     credit_timer_.resched(delay);
-  }else if (credit_q_->byteLength() > 0 && data_q_->byteLength() > 0) {
+  }else if (current_q->byteLength() > 0 && data_q_->byteLength() > 0) {
     fprintf(stderr,"Switch has non-zero queue, but timer was not set.\n");
     exit(1);
   }
