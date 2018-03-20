@@ -217,14 +217,18 @@ void XPassAgent::recv_data(Packet *pkt) {
 
   if (distance < 0) {
     // credit packet reordering or credit sequence number overflow happend.
-    fprintf(stderr, "ERROR: Credit Sequence number is reverted.\n");
-     fprintf(stderr, "REVERT: expected >=%d, got %d.\n",  c_recv_next_, xph->credit_seq() );
+   // fprintf(stderr, "ERROR: Credit Sequence number is reverted.\n");
+  //   fprintf(stderr, "REVERT: expected >=%d, got %d.\n",  c_recv_next_, xph->credit_seq() );
    // exit(1);
+		 if(credit_dropped_ > 0) {
+			credit_dropped_ -= 1;
+		}
+		 fprintf(stderr, "Update Credit dropped = %d\n", credit_dropped_);
  		process_ack(pkt);
   update_rtt(pkt);
 
 } else {
-	fprintf(stderr, "NORMAL: expected >=%d, got %d.\n", c_recv_next_, xph->credit_seq());
+	//fprintf(stderr, "NORMAL: expected >=%d, got %d.\n", c_recv_next_, xph->credit_seq());
   credit_total_ += (distance + 1);
   credit_dropped_ += distance;
 
@@ -496,7 +500,7 @@ void XPassAgent::process_ack(Packet *pkt) {
       receiver_retransmit_timer_.force_cancel();
     }
 		recv_next_ += datalen;
-  	fprintf(stderr,"Set recv_next to %ld, datalen=%ld\n", recv_next_, datalen);
+  //	fprintf(stderr,"Set recv_next to %ld, datalen=%ld\n", recv_next_, datalen);
 	}
 }
 
@@ -521,7 +525,9 @@ void XPassAgent::credit_feedback_control() {
   if (credit_total_ == 0) {
     return;
   }
-
+	if (credit_dropped_ < 0) {
+		credit_dropped_ 
+	}
   int old_rate = cur_credit_rate_;
   double loss_rate = credit_dropped_/(double)credit_total_;
   double target_loss = (1.0 - cur_credit_rate_/(double)max_credit_rate_) * target_loss_scaling_;

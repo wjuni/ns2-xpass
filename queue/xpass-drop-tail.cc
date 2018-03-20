@@ -66,7 +66,8 @@ void XPassDropTail::enque(Packet* p) {
     if (q->byteLength() > credit_q_limit_) {
       q->remove(p);
       drop(p);
-    }
+    	fprintf(stderr,"Credit Packet drop, at q=%d\n", cos%queue_cnt_);
+		}
   }else {
     // p is data packet.
     data_q_->enque(p);
@@ -93,7 +94,7 @@ Packet* XPassDropTail::deque() {
 	PacketQueue *current_q = credit_q_[current_q_no_];
 packet = current_q->head();
   if (packet && tokens_ >= hdr_cmn::access(packet)->size()) {
- 	fprintf(stderr, "Deque from queue=%d\n", current_q_no_);
+ 	//fprintf(stderr, "Deque from queue=%d\n", current_q_no_);
      // Credit packet should be forwarded.
     packet = current_q->deque();
     tokens_ -= hdr_cmn::access(packet)->size();
