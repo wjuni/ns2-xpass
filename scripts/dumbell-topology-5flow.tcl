@@ -82,7 +82,7 @@ for {set i 0} {$i < $N} {incr i} {
 
 puts "Simulation started."
 set nextTime 0.0
-set init_size_len   100000000
+set init_size_len   60000000
 set init_size [expr $init_size_len*(1+0.5+0.333+0.25+0.2)]
 $ns at $nextTime "$sender(0) advance-bytes $init_size"
 set nextTime [expr $nextTime + $interFlowDelay]

@@ -1,7 +1,8 @@
 set ns [new Simulator]
 
 # Configurations
-set N 256
+set N 128
+
 
 set ALPHA 0.5
 set w_init 0.5
@@ -83,7 +84,7 @@ for {set i 0} {$i < $N} {incr i} {
 puts "Simulation started."
 set nextTime 0.0
 for {set i 0} {$i < $N} {incr i} {
-  $ns at $nextTime "$sender($i) advance-bytes 100000000"
+  $ns at $nextTime "$sender($i) advance-bytes 1000000000"
   set nextTime [expr $nextTime + $interFlowDelay]
 }
 
