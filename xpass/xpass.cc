@@ -112,7 +112,7 @@ int XPassAgent::delay_bind_dispatch(const char *varName, const char *localName,
 void XPassAgent::init() {
   w_ = w_init_;
   cur_credit_rate_ = (int)(alpha_ * 64734895);//(int)(alpha_ * max_credit_rate_);
-  bic_target_rate_ =  64734895/128;
+  bic_target_rate_ =  64734895/2;//128;
   last_credit_rate_update_ = now();
 }
 

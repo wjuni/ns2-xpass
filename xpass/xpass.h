@@ -93,8 +93,8 @@ public:
                 sender_retransmit_timer_(this), receiver_retransmit_timer_(this),
                 curseq_(1), t_seqno_(1), recv_next_(1),
                 c_seqno_(1), c_recv_next_(1), rtt_(-0.0),
-                bic_target_loss_(0.02), bic_increase_rate_(0.5), bic_target_rate_(0),
-                bic_prev_credit_rate_(0), bic_s_min_(100000), bic_s_max_(1000000),
+                bic_target_loss_(0.02), bic_increase_rate_(1), bic_target_rate_(0),
+                bic_prev_credit_rate_(0), bic_s_min_(100000), bic_s_max_(10000000),
                 credit_feedback_control_(XPASS_CREDIT_BIC),
                 credit_recved_(0), wait_retransmission_(false) { }
   virtual int command(int argc, const char*const* argv);

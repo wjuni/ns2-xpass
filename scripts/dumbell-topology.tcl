@@ -84,7 +84,7 @@ for {set i 0} {$i < $N} {incr i} {
 puts "Simulation started."
 set nextTime 0.0
 for {set i 0} {$i < $N} {incr i} {
-  $ns at $nextTime "$sender($i) advance-bytes 1000000000"
+  $ns at $nextTime "$sender($i) advance-bytes 500000000"
   set nextTime [expr $nextTime + $interFlowDelay]
 }
 
