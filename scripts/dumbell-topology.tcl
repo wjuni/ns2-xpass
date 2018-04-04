@@ -1,7 +1,7 @@
 set ns [new Simulator]
 
 # Configurations
-set N 128
+set N 64
 
 
 set ALPHA 0.5

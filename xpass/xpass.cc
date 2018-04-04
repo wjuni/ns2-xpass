@@ -590,7 +590,7 @@ void XPassAgent::credit_feedback_control_bic() {
      //  bic_target_rate_ = data_received_rate;
      
      UPDATE_WITH_LIMIT(bic_target_rate_, bic_prev_credit_rate_, bic_s_min_, bic_s_max_);
-     if (now() > 11.00 && now() < 11.06) 
+     if (now() > 11.00 && now() < 11.06 && fid_ == 1) 
 			 printf("CFC : dec, reverting target=%d (%d)\n", bic_target_rate_, max_credit_rate_);
     } else {
       // double loss
