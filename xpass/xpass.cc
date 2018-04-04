@@ -574,7 +574,7 @@ void XPassAgent::credit_feedback_control_bic() {
   double loss_rate = credit_dropped_/(double)credit_total_;
   int min_rate = (int)(avg_credit_size() / rtt_);
   double data_received_rate = 0;
-   
+  bic_target_loss_ =  (1.0 - cur_credit_rate_/(double) 64734895.) * target_loss_scaling_;
   if (loss_rate > bic_target_loss_){
     // congestion has been detected!
     if (loss_rate >= 1.0) {
