@@ -208,6 +208,9 @@ protected:
   // whether to apply dynamic target loss on credit feedback control
   bool dynamic_target_loss_;
 
+
+  bool adaptive_initial_rate_; 
+
 #ifdef XPASS_CFC_BIC
   double bic_target_loss_;
   double bic_increase_rate_;

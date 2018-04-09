@@ -116,6 +116,9 @@ int XPassAgent::delay_bind_dispatch(const char *varName, const char *localName,
   if (delay_bind_bool(varName, localName, "early_credit_stop_", reinterpret_cast<int *>(&early_credit_stop_), tracer)) {
     return TCL_OK;
   }
+  if (delay_bind_bool(varName, localName, "adaptive_initial_rate_", reinterpret_cast<int *>(&adaptive_initial_rate_), tracer)) {
+    return TCL_OK;
+  }
   if (delay_bind_bool(varName, localName, "dynamic_target_loss_", reinterpret_cast<int *>(&dynamic_target_loss_), tracer)) {
     return TCL_OK;
   }
@@ -187,7 +190,7 @@ void XPassAgent::recv_credit_request(Packet *pkt) {
     case XPASS_SEND_CLOSED:
       double lalpha;
       init();
-      if (!early_credit_stop_ || xph->sendbuffer_ >= 40) {
+      if (!adaptive_initial_rate_ || xph->sendbuffer_ >= 40) {
         lalpha = alpha_;
       } else {
         lalpha = alpha_ * xph->sendbuffer_ / 40.0;
@@ -226,7 +229,7 @@ void XPassAgent::recv_credit(Packet *pkt) {
         // Because ns2 does not allow sending two consecutive packets, 
         // credit_stop_timer_ schedules CREDIT_STOP packet with no delay.
         credit_stop_timer_.sched(0);
-      } else if (now() - last_credit_recv_update_ >= rtt_) {
+      } else if (early_credit_stop_ && now() - last_credit_recv_update_ >= rtt_) {
         if (credit_recved_rtt_ >= pkt_remaining()) {
           // Early credit stop
           if (credit_stop_timer_.status() != TIMER_IDLE) {
