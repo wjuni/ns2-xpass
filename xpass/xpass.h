@@ -98,6 +98,7 @@ public:
                 sender_retransmit_timer_(this), receiver_retransmit_timer_(this),
                 curseq_(1), t_seqno_(1), recv_next_(1),
                 c_seqno_(1), c_recv_next_(1), rtt_(-0.0),
+                initial_credit_rate_(0.0),
 #ifdef XPASS_CFC_BIC
                 bic_target_loss_(0), bic_increase_rate_(0.5), bic_target_rate_(0),
                 bic_prev_credit_rate_(0), bic_s_min_(100000), bic_s_max_(6000000),
@@ -208,8 +209,11 @@ protected:
   // whether to apply dynamic target loss on credit feedback control
   bool dynamic_target_loss_;
 
-
+  // whether to apply adaptive initial rate
   bool adaptive_initial_rate_; 
+
+  // predefined initial credit rate
+  int initial_credit_rate_;
 
 #ifdef XPASS_CFC_BIC
   double bic_target_loss_;

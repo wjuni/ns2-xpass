@@ -1615,6 +1615,7 @@ Agent/XPass set retransmit_timeout_ 0.1 ;# 100ms
 Agent/XPass set default_credit_stop_timeout_ 0.002 ;# 2ms
 Agent/XPass set min_jitter_ -0.1
 Agent/XPass set max_jitter_ 0.1
-Agent/XPass set early_credit_stop_ false
-Agent/XPass set adaptive_initial_rate_ false
+Agent/XPass set early_credit_stop_ true
+Agent/XPass set adaptive_initial_rate_ true
 Agent/XPass set dynamic_target_loss_ true
+Agent/XPass set initial_credit_rate_ 64734895 ;#fix

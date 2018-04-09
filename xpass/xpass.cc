@@ -57,6 +57,7 @@ void XPassAgent::delay_bind_init_all() {
   delay_bind_init_one("early_credit_stop_");
   delay_bind_init_one("adaptive_initial_rate_");
   delay_bind_init_one("dynamic_target_loss_");
+  delay_bind_init_one("initial_credit_rate_");
 
   Agent::delay_bind_init_all();
 }
@@ -123,16 +124,17 @@ int XPassAgent::delay_bind_dispatch(const char *varName, const char *localName,
   if (delay_bind_bool(varName, localName, "dynamic_target_loss_", reinterpret_cast<int *>(&dynamic_target_loss_), tracer)) {
     return TCL_OK;
   }
+  if (delay_bind(varName, localName, "initial_credit_rate_", &initial_credit_rate_, tracer)) {
+    return TCL_OK;
+  }
   return Agent::delay_bind_dispatch(varName, localName, tracer);
 }
 
 void XPassAgent::init() {
   w_ = w_init_;
-//  cur_credit_rate_ = (int)(alpha_ * max_credit_rate_);
-
 #ifdef XPASS_CFC_BIC
-  cur_credit_rate_ = (int)(alpha_ * 64734895);
-  bic_target_rate_ =  64734895/2;
+  cur_credit_rate_ = (int)(alpha_ * initial_credit_rate_);
+  bic_target_rate_ =  initial_credit_rate_/2;
 #endif
   last_credit_rate_update_ = now();
 }
@@ -196,7 +198,7 @@ void XPassAgent::recv_credit_request(Packet *pkt) {
       } else {
         lalpha = alpha_ * xph->sendbuffer_ / 40.0;
       } 
-      cur_credit_rate_ = (int)(lalpha * max_credit_rate_);
+      cur_credit_rate_ = (int)(lalpha * initial_credit_rate_);
       fst_ = xph->credit_sent_time();
       // need to start to send credits.
       send_credit();
