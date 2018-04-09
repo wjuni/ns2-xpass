@@ -8,6 +8,13 @@
 #include <assert.h>
 #include <math.h>
 
+// Define one of XPASS_CFC_ORIGINAL, XPASS_CFC_BIC, XPASS_CFC_CUBIC
+#define XPASS_CFC_BIC
+
+#if !defined(XPASS_CFC_ORIGINAL) && !defined(XPASS_CFC_BIC) && !defined(XPASS_CFC_CUBIC)
+#error Xpass credit feedback control method (XPASS_CFC_X) must be designated.
+#endif
+
 typedef enum XPASS_SEND_STATE_ {
   XPASS_SEND_CLOSED,
   XPASS_SEND_CREDIT_SENDING,
@@ -91,6 +98,10 @@ public:
                 sender_retransmit_timer_(this), receiver_retransmit_timer_(this),
                 curseq_(1), t_seqno_(1), recv_next_(1),
                 c_seqno_(1), c_recv_next_(1), rtt_(-0.0),
+#ifdef XPASS_CFC_BIC
+                bic_target_loss_(0), bic_increase_rate_(0.5), bic_target_rate_(0),
+                bic_prev_credit_rate_(0), bic_s_min_(100000), bic_s_max_(6000000),
+#endif
                 credit_recved_(0), wait_retransmission_(false),
                 credit_wasted_(0), credit_recved_rtt_(0), last_credit_recv_update_(0) { }
   virtual int command(int argc, const char*const* argv);
@@ -190,6 +201,21 @@ protected:
 
   // temp variables
   int credit_wasted_;
+
+  // whether to apply early credit stop
+  bool early_credit_stop_;
+
+  // whether to apply dynamic target loss on credit feedback control
+  bool dynamic_target_loss_;
+
+#ifdef XPASS_CFC_BIC
+  double bic_target_loss_;
+  double bic_increase_rate_;
+  int bic_target_rate_;
+  int bic_prev_credit_rate_;
+  int bic_s_min_;
+  int bic_s_max_;
+#endif
 
   inline double now() { return Scheduler::instance().clock(); }
   seq_t datalen_remaining() { return (curseq_ - t_seqno_); }
