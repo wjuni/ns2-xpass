@@ -55,6 +55,7 @@ void XPassAgent::delay_bind_init_all() {
   delay_bind_init_one("min_jitter_");
   delay_bind_init_one("max_jitter_");
   delay_bind_init_one("early_credit_stop_");
+  delay_bind_init_one("adaptive_initial_rate_");
   delay_bind_init_one("dynamic_target_loss_");
 
   Agent::delay_bind_init_all();
