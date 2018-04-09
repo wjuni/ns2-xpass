@@ -1,6 +1,12 @@
 #include "xpass.h"
 #include "../tcp/template.h"
 
+#ifdef XPASS_CFC_BIC
+#define ABS(a) ((a) >= 0 ? (a) : -(a))
+#define UPDATE_WITH_LIMIT(target, value, minval, maxval) target = (ABS((target)-(value))>(maxval)? (((target) > (value)) ? (target)-(maxval) : (target) + (maxval) ) : (ABS((target)-(value)) < (minval) ? \
+           ( ((target) > (value)) ? (target)-(minval) : (target)+(minval) ) : (value)))
+#endif
+
 int hdr_xpass::offset_;
 static class XPassHeaderClass: public PacketHeaderClass {
 public:
@@ -48,6 +54,9 @@ void XPassAgent::delay_bind_init_all() {
   delay_bind_init_one("default_credit_stop_timeout_");
   delay_bind_init_one("min_jitter_");
   delay_bind_init_one("max_jitter_");
+  delay_bind_init_one("early_credit_stop_");
+  delay_bind_init_one("dynamic_target_loss_");
+
   Agent::delay_bind_init_all();
 }
 
@@ -104,12 +113,23 @@ int XPassAgent::delay_bind_dispatch(const char *varName, const char *localName,
   if (delay_bind(varName, localName, "min_jitter_", &min_jitter_, tracer)) {
     return TCL_OK;
   }
+  if (delay_bind_bool(varName, localName, "early_credit_stop_", reinterpret_cast<int *>(&early_credit_stop_), tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind_bool(varName, localName, "dynamic_target_loss_", reinterpret_cast<int *>(&dynamic_target_loss_), tracer)) {
+    return TCL_OK;
+  }
   return Agent::delay_bind_dispatch(varName, localName, tracer);
 }
 
 void XPassAgent::init() {
   w_ = w_init_;
 //  cur_credit_rate_ = (int)(alpha_ * max_credit_rate_);
+
+#ifdef XPASS_CFC_BIC
+  cur_credit_rate_ = (int)(alpha_ * 64734895);
+  bic_target_rate_ =  64734895/2;
+#endif
   last_credit_rate_update_ = now();
 }
 
@@ -167,7 +187,7 @@ void XPassAgent::recv_credit_request(Packet *pkt) {
     case XPASS_SEND_CLOSED:
       double lalpha;
       init();
-      if (xph->sendbuffer_ >= 40) {
+      if (!early_credit_stop_ || xph->sendbuffer_ >= 40) {
         lalpha = alpha_;
       } else {
         lalpha = alpha_ * xph->sendbuffer_ / 40.0;
@@ -550,7 +570,7 @@ void XPassAgent::update_rtt(Packet *pkt) {
     rtt_ = rtt;
   }
 }
-
+#ifdef XPASS_CFC_ORIGINAL
 void XPassAgent::credit_feedback_control() {
   if (rtt_ <= 0.0) {
     return;
@@ -605,3 +625,72 @@ void XPassAgent::credit_feedback_control() {
   credit_dropped_ = 0;
   last_credit_rate_update_ = now();
 }
+#endif
+
+#ifdef XPASS_CFC_BIC
+void XPassAgent::credit_feedback_control() {
+  int old_rate = cur_credit_rate_;
+  if (rtt_ <= 0.0) {
+    return;
+  }
+  if ((now() - last_credit_rate_update_) < rtt_) {
+    return;
+  }
+  if (credit_total_ == 0) {
+    return;
+  }
+
+  double loss_rate = credit_dropped_/(double)credit_total_;
+  int min_rate = (int)(avg_credit_size() / rtt_);
+  double data_received_rate = 0;
+  if (dynamic_target_loss_)
+    bic_target_loss_ =  (1.0 - cur_credit_rate_/(double) 64734895.) * target_loss_scaling_;
+  else
+    bic_target_loss_ = target_loss_scaling_;
+
+  if (loss_rate > bic_target_loss_){
+    // congestion has been detected!
+    if (loss_rate >= 1.0) {
+      data_received_rate = (int)(avg_credit_size() / rtt_);
+    } else {
+      data_received_rate = (int)(avg_credit_size()*(credit_total_ - credit_dropped_)
+          / (now() - last_credit_rate_update_));
+    }
+    if (bic_prev_credit_rate_ <= bic_target_rate_) {
+      // normal situation
+      UPDATE_WITH_LIMIT(bic_target_rate_, bic_prev_credit_rate_, bic_s_min_, bic_s_max_);
+    } else {
+      // double loss
+      UPDATE_WITH_LIMIT(bic_target_rate_, data_received_rate, bic_s_min_, bic_s_max_);
+    }
+    UPDATE_WITH_LIMIT(cur_credit_rate_, (bic_target_rate_ + cur_credit_rate_)/2 , bic_s_min_, bic_s_max_);
+
+  } else {
+    // there is no congestion.
+    if (bic_target_rate_ - cur_credit_rate_ <= 0.05 * bic_target_rate_) {
+      // exponential
+      if(cur_credit_rate_ < bic_target_rate_) {
+        UPDATE_WITH_LIMIT(cur_credit_rate_, bic_target_rate_, bic_s_min_, bic_s_max_);
+      } else {
+        int new_rate = cur_credit_rate_ + (cur_credit_rate_ - bic_target_rate_) * (1.0+bic_increase_rate_);
+        UPDATE_WITH_LIMIT(cur_credit_rate_, new_rate, bic_s_min_, bic_s_max_);
+      }
+    } else {
+      // binary
+      UPDATE_WITH_LIMIT(cur_credit_rate_, (cur_credit_rate_ + bic_target_rate_)/2 , bic_s_min_, bic_s_max_);
+    }
+  }
+
+  if (cur_credit_rate_ > max_credit_rate_) {
+    cur_credit_rate_ = max_credit_rate_;
+  }
+  if (cur_credit_rate_ < min_rate) {
+    cur_credit_rate_ = min_rate;
+  }
+
+  credit_total_ = 0;
+  credit_dropped_ = 0;
+  last_credit_rate_update_ = now();
+  bic_prev_credit_rate_ = old_rate;
+}
+#endif
