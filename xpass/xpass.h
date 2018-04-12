@@ -100,8 +100,8 @@ public:
                 c_seqno_(1), c_recv_next_(1), rtt_(-0.0),
                 initial_credit_rate_(0.0),
 #ifdef XPASS_CFC_BIC
-                bic_target_loss_(0), bic_increase_rate_(0.5), bic_target_rate_(0),
-                bic_prev_credit_rate_(0), bic_s_min_(100000), bic_s_max_(6000000),
+                bic_target_loss_(0), bic_increase_rate_(0.05), bic_target_rate_(0),
+                bic_prev_credit_rate_(0), bic_s_min_(100000), bic_s_max_(15000000),
 #endif
                 credit_recved_(0), wait_retransmission_(false),
                 credit_wasted_(0), credit_recved_rtt_(0), last_credit_recv_update_(0) { }
@@ -204,13 +204,13 @@ protected:
   int credit_wasted_;
 
   // whether to apply early credit stop
-  bool early_credit_stop_;
+  int early_credit_stop_;
 
   // whether to apply dynamic target loss on credit feedback control
-  bool dynamic_target_loss_;
+  int dynamic_target_loss_;
 
   // whether to apply adaptive initial rate
-  bool adaptive_initial_rate_; 
+  int adaptive_initial_rate_; 
 
   // predefined initial credit rate
   int initial_credit_rate_;

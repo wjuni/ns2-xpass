@@ -115,13 +115,13 @@ int XPassAgent::delay_bind_dispatch(const char *varName, const char *localName,
   if (delay_bind(varName, localName, "min_jitter_", &min_jitter_, tracer)) {
     return TCL_OK;
   }
-  if (delay_bind_bool(varName, localName, "early_credit_stop_", reinterpret_cast<int *>(&early_credit_stop_), tracer)) {
+  if (delay_bind(varName, localName, "early_credit_stop_", (&early_credit_stop_), tracer)) {
     return TCL_OK;
   }
-  if (delay_bind_bool(varName, localName, "adaptive_initial_rate_", reinterpret_cast<int *>(&adaptive_initial_rate_), tracer)) {
+  if (delay_bind(varName, localName, "adaptive_initial_rate_", (&adaptive_initial_rate_), tracer)) {
     return TCL_OK;
   }
-  if (delay_bind_bool(varName, localName, "dynamic_target_loss_", reinterpret_cast<int *>(&dynamic_target_loss_), tracer)) {
+  if (delay_bind(varName, localName, "dynamic_target_loss_", (&dynamic_target_loss_), tracer)) {
     return TCL_OK;
   }
   if (delay_bind(varName, localName, "initial_credit_rate_", &initial_credit_rate_, tracer)) {
@@ -233,7 +233,7 @@ void XPassAgent::recv_credit(Packet *pkt) {
         // credit_stop_timer_ schedules CREDIT_STOP packet with no delay.
         credit_stop_timer_.sched(0);
       } else if (early_credit_stop_ && now() - last_credit_recv_update_ >= rtt_) {
-        if (credit_recved_rtt_ >= pkt_remaining()) {
+        if (credit_recved_rtt_ >= pkt_remaining()*2 ) {
           // Early credit stop
           if (credit_stop_timer_.status() != TIMER_IDLE) {
             fprintf(stderr, "Error: CreditStopTimer seems to be scheduled more than once.\n");
@@ -660,9 +660,9 @@ void XPassAgent::credit_feedback_control() {
       data_received_rate = (int)(avg_credit_size() / rtt_);
     } else {
       data_received_rate = (int)(avg_credit_size()*(credit_total_ - credit_dropped_)
-          / (now() - last_credit_rate_update_));
+          / (now() - last_credit_rate_update_) * (1. + bic_target_loss_));
     }
-    if (bic_prev_credit_rate_ <= bic_target_rate_) {
+/*    if (bic_prev_credit_rate_ <= bic_target_rate_) {
       // normal situation
       UPDATE_WITH_LIMIT(bic_target_rate_, bic_prev_credit_rate_, bic_s_min_, bic_s_max_);
     } else {
@@ -670,7 +670,10 @@ void XPassAgent::credit_feedback_control() {
       UPDATE_WITH_LIMIT(bic_target_rate_, data_received_rate, bic_s_min_, bic_s_max_);
     }
     UPDATE_WITH_LIMIT(cur_credit_rate_, (bic_target_rate_ + cur_credit_rate_)/2 , bic_s_min_, bic_s_max_);
-
+*/
+      bic_target_rate_ = cur_credit_rate_;
+      if (cur_credit_rate_ > data_received_rate)
+        UPDATE_WITH_LIMIT(cur_credit_rate_, data_received_rate, bic_s_min_, bic_s_max_);
   } else {
     // there is no congestion.
     if (bic_target_rate_ - cur_credit_rate_ <= 0.05 * bic_target_rate_) {
