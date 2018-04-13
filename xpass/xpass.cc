@@ -242,7 +242,7 @@ void XPassAgent::recv_credit(Packet *pkt) {
         // credit_stop_timer_ schedules CREDIT_STOP packet with no delay.
         credit_stop_timer_.sched(0);
       } else if (early_credit_stop_ && now() - last_credit_recv_update_ >= rtt_) {
-        if (credit_recved_rtt_ >= pkt_remaining()*2 ) {
+        if (credit_recved_rtt_ >= pkt_remaining()*1 ) {
           // Early credit stop
           if (credit_stop_timer_.status() != TIMER_IDLE) {
             fprintf(stderr, "Error: CreditStopTimer seems to be scheduled more than once.\n");
@@ -671,7 +671,7 @@ void XPassAgent::credit_feedback_control() {
   int min_rate = (int)(avg_credit_size() / rtt_);
   double data_received_rate = 0;
   if (dynamic_target_loss_)
-    bic_target_loss_ =  (1.0 - cur_credit_rate_/(double) 64734895.) * target_loss_scaling_;
+    bic_target_loss_ =  (1.0 - cur_credit_rate_/(double) max_credit_rate_) * target_loss_scaling_;
   else
     bic_target_loss_ = target_loss_scaling_;
 
@@ -681,7 +681,7 @@ void XPassAgent::credit_feedback_control() {
       data_received_rate = (int)(avg_credit_size() / rtt_);
     } else {
       data_received_rate = (int)(avg_credit_size()*(credit_total_ - credit_dropped_)
-          / (now() - last_credit_rate_update_) * (1. + bic_target_loss_));
+          / (now() - last_credit_rate_update_) * (1. + target_loss_scaling_));
     }
 /*    if (bic_prev_credit_rate_ <= bic_target_rate_) {
       // normal situation

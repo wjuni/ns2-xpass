@@ -110,8 +110,8 @@ public:
                 c_seqno_(1), c_recv_next_(1), rtt_(-0.0),
                 initial_credit_rate_(0.0),
 #ifdef XPASS_CFC_BIC
-                bic_target_loss_(0), bic_increase_rate_(0.05), bic_target_rate_(0),
-                bic_prev_credit_rate_(0), bic_s_min_(100000), bic_s_max_(15000000),
+                bic_target_loss_(0), bic_increase_rate_(0.2), bic_target_rate_(0),
+                bic_prev_credit_rate_(0), bic_s_min_(100000), bic_s_max_(6000000),
 #endif
                 credit_recved_(0), wait_retransmission_(false),
                 credit_wasted_(0), credit_recved_rtt_(0), last_credit_recv_update_(0) { }

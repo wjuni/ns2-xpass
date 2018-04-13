@@ -1,7 +1,12 @@
 set ns [new Simulator]
 
+if {$argc < 2} {
+  puts "USAGE: ./ns scripts/dumbell-topology.tcl {N} {exp_id}"
+  exit 1
+}
+
 # Configurations
-set N 100
+set N [expr int([lindex $argv 0])]
 set ALPHA 0.5
 set w_init 0.5
 set linkBW 10Gb
@@ -13,11 +18,12 @@ set hostQueueCapacity [expr 1538*100] ;# bytes
 set maxCrditBurst [expr 84*2] ;# bytes
 set creditRate 64734895 ;# bytes / sec
 set interFlowDelay 0 ;# secs
+set expID [expr int([lindex $argv 1])]
 
 # Output file
 file mkdir "outputs"
-set nt [open outputs/trace.out w]
-set fct_out [open outputs/fct.out w]
+set nt [open "outputs/trace_$expID.out" w]
+set fct_out [open "outputs/fct_$expID.out" w]
 puts $fct_out "Flow ID,Flow Size (bytes),Flow Completion Time (secs)"
 close $fct_out
 
@@ -28,7 +34,7 @@ proc finish {} {
   puts "Simulation terminated successfully."
   exit 0
 }
-#$ns trace-all $nt
+$ns trace-all $nt
 
 puts "Creating Nodes..."
 set left_gateway [$ns node]
@@ -65,6 +71,7 @@ puts "Creating Agents..."
 Agent/XPass set max_credit_rate_ $creditRate
 Agent/XPass set cur_credit_rate_ [expr $ALPHA*$creditRate]
 Agent/XPass set w_ $w_init
+Agent/XPass set exp_id_ $expID
 
 for {set i 0} {$i < $N} {incr i} {
   set sender($i) [new Agent/XPass]
