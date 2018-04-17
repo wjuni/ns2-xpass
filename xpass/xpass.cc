@@ -671,7 +671,7 @@ void XPassAgent::credit_feedback_control() {
   int min_rate = (int)(avg_credit_size() / rtt_);
   double data_received_rate = 0;
   if (dynamic_target_loss_)
-    bic_target_loss_ =  (1.0 - cur_credit_rate_/(double) max_credit_rate_) * target_loss_scaling_;
+    bic_target_loss_ =  (1.0 - cur_credit_rate_/(double) initial_credit_rate_) * target_loss_scaling_;
   else
     bic_target_loss_ = target_loss_scaling_;
 
@@ -681,7 +681,7 @@ void XPassAgent::credit_feedback_control() {
       data_received_rate = (int)(avg_credit_size() / rtt_);
     } else {
       data_received_rate = (int)(avg_credit_size()*(credit_total_ - credit_dropped_)
-          / (now() - last_credit_rate_update_) * (1. + target_loss_scaling_));
+          / (now() - last_credit_rate_update_) * (1. + bic_target_loss_));
     }
 /*    if (bic_prev_credit_rate_ <= bic_target_rate_) {
       // normal situation
