@@ -519,9 +519,16 @@ void XPassAgent::send_credit() {
 
   // send credit.
   send(construct_credit(), 0);
+  credit_cnt_++;
 
+  if(credit_cnt_ % CREDIT_BURST_SIZE != 0) {
+    // resend credit without delay
+    send_credit_timer_.resched(0);
+    return;
+  }
+    
   // calculate delay for next credit transmission.
-  delay = avg_credit_size / cur_credit_rate_;
+  delay = avg_credit_size / cur_credit_rate_ * CREDIT_BURST_SIZE;
   // add jitter
   if (max_jitter_ > min_jitter_) {
     double jitter = (double)rand()/(double)RAND_MAX;

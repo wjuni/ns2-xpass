@@ -12,7 +12,7 @@ set w_init 0.5
 set linkBW 10Gb
 set inputlinkBW 10Gb
 set linkLatency 10us
-set creditQueueCapacity [expr 84*2]  ;# bytes
+set creditQueueCapacity [expr 84*8]  ;# bytes
 set dataQueueCapacity [expr 1538*100] ;# bytes
 set hostQueueCapacity [expr 1538*100] ;# bytes
 set maxCrditBurst [expr 84*2] ;# bytes
