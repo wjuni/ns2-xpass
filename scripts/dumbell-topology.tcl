@@ -12,13 +12,20 @@ set w_init 0.5
 set linkBW 10Gb
 set inputlinkBW 10Gb
 set linkLatency 10us
-set creditQueueCapacity [expr 84*8]  ;# bytes
+set creditQueueCapacity [expr 84*32]  ;# bytes
 set dataQueueCapacity [expr 1538*100] ;# bytes
 set hostQueueCapacity [expr 1538*100] ;# bytes
 set maxCrditBurst [expr 84*2] ;# bytes
 set creditRate 64734895 ;# bytes / sec
-set interFlowDelay 0 ;# secs
 set expID [expr int([lindex $argv 1])]
+
+set avgFlowInterval 0.0005 ;#500us
+set RNGFlowInterval [new RNG]
+$RNGFlowInterval seed 94762103
+
+set randomFlowInterval [new RandomVariable/Exponential]
+$randomFlowInterval use-rng $RNGFlowInterval
+$randomFlowInterval set avg_ $avgFlowInterval
 
 # Output file
 file mkdir "outputs"
@@ -90,7 +97,7 @@ puts "Simulation started."
 set nextTime 0.0
 for {set i 0} {$i < $N} {incr i} {
   $ns at $nextTime "$sender($i) advance-bytes 500000000"
-  set nextTime [expr $nextTime + $interFlowDelay]
+  set nextTime [expr $nextTime+[$randomFlowInterval value]]
 }
 
 $ns at 10.0 "finish"

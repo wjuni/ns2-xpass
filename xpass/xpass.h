@@ -15,7 +15,7 @@
 #error Xpass credit feedback control method (XPASS_CFC_X) must be designated.
 #endif
 
-#define CREDIT_BURST_SIZE 32
+#define CREDIT_BURST_SIZE 16
 
 typedef enum XPASS_SEND_STATE_ {
   XPASS_SEND_CLOSED,
