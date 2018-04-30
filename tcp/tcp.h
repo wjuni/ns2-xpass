@@ -105,6 +105,8 @@ struct hdr_tcp {
 #define CWND_HALF_WITH_MIN	0x00000200
 #define TCP_IDLE		0x00000400
 #define NO_OUTSTANDING_DATA     0x00000800
+#define CLOSE_SSTHRESH_DCTCP   0x00001000
+#define CLOSE_CWND_DCTCP       0x00002000
 
 /*
  * tcp_tick_:
@@ -115,8 +117,8 @@ struct hdr_tcp {
 
 #define NUMDUPACKS 3		/* This is no longer used.  The variable */
 				/* numdupacks_ is used instead. */
-#define TCP_MAXSEQ 1073741824   /* Number that curseq_ is set to for */
-				/* "infinite send" (2^30)            */
+#define TCP_MAXSEQ 107374182400ll   /* Number that curseq_ is set to for */
+				/* "infinite send" (2^30*100)            */
 
 #define TCP_TIMER_RTX		0
 #define TCP_TIMER_DELSND	1
@@ -151,6 +153,15 @@ protected:
 	TcpAgent *a_;
 };
 
+class PacerTimer : public TimerHandler {
+public:
+  PacerTimer(TcpAgent *a) : TimerHandler() { a_ = a; }
+protected:
+  virtual void expire(Event *e);
+  TcpAgent *a_;
+};
+
+
 /*
  * Variables for HighSpeed TCP.
  */
@@ -167,7 +178,7 @@ struct hstcp {
 	/*   the HighSpeed parameters less frequently.  A better solution */
  	/*   might be just to have a look-up array.  */
 	double cwnd_last_;	/* last cwnd for computed parameters */
-        double increase_last_;	/* increase param for cwnd_last_ */
+  double increase_last_;	/* increase param for cwnd_last_ */
 	hstcp() : low_p(0.0), dec1(0.0), dec2(0.0), p1(0.0), p2(0.0),
 	    cwnd_last_(0.0), increase_last_(0.0) { }
 };
@@ -177,7 +188,7 @@ class TcpAgent : public Agent {
 public:
 	TcpAgent();
 	virtual ~TcpAgent() {free(tss);}
-        virtual void recv(Packet*, Handler*);
+  virtual void recv(Packet*, Handler*);
 	virtual void timeout(int tno);
 	virtual void timeout_nonrtx(int tno);
 	int command(int argc, const char*const* argv);
@@ -445,6 +456,13 @@ protected:
 				  /*  performance for Reno with ECN.  */
 	int use_rtt_;	     /* Use RTT for timeout for ECN-marked SYN-ACK */
 	/* end of ECN */
+
+  /* Used for DCTCP */
+  int dctcp_;
+  double dctcp_alpha_;
+  double dctcp_g_;
+  double dctcp_alpha_print_;
+  /* end of DCTCP */
 
 	/* used for Explicit Loss Notification */
 	void tcp_eln(Packet *pkt); /* reaction to ELN (usually wireless) */
