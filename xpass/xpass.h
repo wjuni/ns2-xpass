@@ -95,10 +95,10 @@ public:
                 credit_wasted_(0), credit_recved_rtt_(0), last_credit_recv_update_(0) { }
   virtual int command(int argc, const char*const* argv);
   virtual void recv(Packet*, Handler*);
-protected:
   virtual void delay_bind_init_all();
   virtual int delay_bind_dispatch(const char *varName, const char *localName, TclObject *tracer);
-
+protected:
+ 
   // credit send state
   XPASS_SEND_STATE credit_send_state_;
   // credit receive state
@@ -194,7 +194,7 @@ protected:
   inline double now() { return Scheduler::instance().clock(); }
   seq_t datalen_remaining() { return (curseq_ - t_seqno_); }
   int max_segment() { return (max_ethernet_size_ - xpass_hdr_size_); }
-  int pkt_remaining() { return ceil(datalen_remaining()/(double)max_segment()); }
+  int pkt_remaining() { printf("me = %d, xh=%d\n", max_ethernet_size_, xpass_hdr_size_); return ceil(datalen_remaining()/(double)max_segment()); }
   double avg_credit_size() { return (min_credit_size_ + max_credit_size_)/2.0; }
 
   void init();

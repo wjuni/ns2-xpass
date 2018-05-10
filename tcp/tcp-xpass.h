@@ -8,23 +8,12 @@
 
 class XPassQueueAgent;
 
-class XPassTcpAgent : public FullTcpAgent {
-public:
-  XPassTcpAgent() : FullTcpAgent() { }
-  ~XPassTcpAgent() { }
-  virtual void recv(Packet *pkt, Handler*);
-protected:
-	virtual void delay_bind_init_all();
-	virtual int delay_bind_dispatch(const char *varName, const char *localName, TclObject *tracer);
-
-  void sendpacket(seq_t seqno, seq_t ackno, int pflags, int datalen, int reason, Packet *p);
-  XPassQueueAgent* xpass_agent_;
-};
-
 class XPassQueueAgent : public XPassAgent {
 public:
   std::queue<Packet *> packet_queue_;
-  XPassQueueAgent() : XPassAgent() {}
+  XPassQueueAgent() : XPassAgent() { 
+  }
+  virtual int delay_bind_dispatch(const char *varName, const char *localName, TclObject *tracer);
   bool recv_bool(Packet *pkt);
   void recv_data(Packet *pkt); 
   void advance_packets(Packet *p);
@@ -32,7 +21,27 @@ public:
   Packet* construct_credit_stop();
   Packet* construct_credit();
   Packet* construct_data(Packet *credit); 
-  Packet* construct_nack(seq_t seq_no); 
+  Packet* construct_nack(seq_t seq_no);
+
+  void add_datalen(seq_t nb); 
+};
+
+class XPassTcpAgent : public FullTcpAgent {
+public:
+  XPassTcpAgent() : FullTcpAgent() {
+    xpass_agent_ = new XPassQueueAgent();
+  }
+  ~XPassTcpAgent() { }
+  virtual void recv(Packet *pkt, Handler*);
+protected:
+	virtual void delay_bind_init_all();
+	virtual int delay_bind_dispatch(const char *varName, const char *localName, TclObject *tracer);
+
+  void sendpacket(seq_t seqno, seq_t ackno, int pflags, int datalen, int reason, Packet *p);
+
+  void advance_bytes(seq_t nb);
+
+  XPassQueueAgent* xpass_agent_;
 };
 
 #endif

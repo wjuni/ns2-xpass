@@ -78,6 +78,7 @@ int XPassAgent::delay_bind_dispatch(const char *varName, const char *localName,
   }
   if (delay_bind(varName, localName, "xpass_hdr_size_", &xpass_hdr_size_,
                  tracer)) {
+    printf("xpass_hdr_size_ = %d\n", xpass_hdr_size_);
     return TCL_OK;
   }
   if (delay_bind(varName, localName, "target_loss_scaling_", &target_loss_scaling_,

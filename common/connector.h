@@ -47,7 +47,8 @@ public:
 	Connector();
 	inline NsObject* target() { return target_; }
 	void target (NsObject *target) { target_ = target; }
-	virtual void drop(Packet* p);
+	NsObject* getTarget() { return target_; }
+  virtual void drop(Packet* p);
 	void setDropTarget(NsObject *dt) {drop_ = dt; } 
 protected:
 	virtual void drop(Packet* p, const char *s);

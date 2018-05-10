@@ -1094,7 +1094,7 @@ FullTcpAgent::foutput(seq_t seqno, int reason)
 	return 0;
 
 send:
-
+  printf("Sending...Datalen = %d\n", datalen);
 	// is a syn or fin?
 
 	syn = (pflags & TH_SYN) ? 1 : 0;

@@ -31,14 +31,18 @@ void
 XPassTcpAgent::delay_bind_init_all()
 {
   // delay_bind_init_one()
+  xpass_agent_->delay_bind_init_all();
   FullTcpAgent::delay_bind_init_all();
 }
 
 int
 XPassTcpAgent::delay_bind_dispatch(const char *varName, const char *localName, TclObject *tracer)
 {
+  printf("%s\n", varName);
+  
   //if (delay_bind(varName, localName, "segsperack_", &segs_per_ack_, tracer)) return TCL_OK;
-  return FullTcpAgent::delay_bind_dispatch(varName, localName, tracer);
+  FullTcpAgent::delay_bind_dispatch(varName, localName, tracer);
+  return xpass_agent_->delay_bind_dispatch(varName, localName, tracer);
 }
 
 /*
@@ -55,7 +59,8 @@ XPassTcpAgent::delay_bind_dispatch(const char *varName, const char *localName, T
 void
 XPassTcpAgent::sendpacket(seq_t seqno, seq_t ackno, int pflags, int datalen, int reason, Packet *p)
 {
-        if (!p) p = allocpkt();
+  printf("Call new sendpacket\n");
+  if (!p) p = allocpkt();
         hdr_tcp *tcph = hdr_tcp::access(p);
 	hdr_flags *fh = hdr_flags::access(p);
 
@@ -138,21 +143,146 @@ XPassTcpAgent::sendpacket(seq_t seqno, seq_t ackno, int pflags, int datalen, int
 //printf("%f(%s)[state:%s]: sending pkt ", now(), name(), statestr(state_));
 //prpkt(p);
 //}
-  if (pflags & (TH_ACK | TH_SYN | TH_FIN))
-	  send(p, 0);
-  else {
-      }
+  if (pflags & (TH_SYN | TH_FIN) || datalen == 0){
+    // later should be moved to esablish checker
+    if(pflags & (TH_SYN)){
+     // delete xpass_agent_;
+     // xpass_agent_ = new XPassQueueAgent();
+    }
+    send(p, 0);
+    printf("Send RAW, len:%d, ACK:%d, SYN:%d, FIN:%d\n", datalen, pflags & TH_ACK, pflags & TH_SYN, pflags & TH_FIN);
+  } else {
+     printf("Send advance, len:%d\n", datalen);
+     xpass_agent_->target(getTarget());
+     xpass_agent_->add_datalen(0);
+     xpass_agent_->advance_packets(p);
+   }
 	return;
 }
 
 void
-XPassTcpAgent::recv(Packet *pkt, Handler* h)
+XPassTcpAgent::recv(Packet *pkt, Handler*)
 {
+  hdr_tcp *tcph = hdr_tcp::access(pkt);
+	int pflags = tcph->flags();
+  printf("Recv RAW, ACK:%d, SYN:%d, FIN:%d\n", pflags & TH_ACK, pflags & TH_SYN, pflags & TH_FIN);
   if(xpass_agent_->recv_bool(pkt))
-    FullTcpAgent::recv(pkt, h);
+    FullTcpAgent::recv(pkt, NULL);
 }
 
+
+/*
+ * the byte-oriented interface: advance_bytes(int nbytes)
+ */
+
+void
+XPassTcpAgent::advance_bytes(seq_t nb)
+{
+
+	//
+	// state-specific operations:
+	//	if CLOSED or LISTEN, reset and try a new active open/connect
+	//	if ESTABLISHED, queue and try to send more
+	//	if SYN_SENT or SYN_RCVD, just queue
+	//	if above ESTABLISHED, we are closing, so don't allow
+	//
+  printf("State = %s\n", statestr(state_));
+	switch (state_) {
+
+	case TCPS_CLOSED:
+	case TCPS_LISTEN:
+    reset();
+    curseq_ = iss_ + nb;
+    connect();              // initiate new connection
+    xpass_agent_->add_datalen(nb);
+    break;
+
+	case TCPS_ESTABLISHED:
+	case TCPS_SYN_SENT:
+	case TCPS_SYN_RECEIVED:
+                if (curseq_ < iss_) 
+                        curseq_ = iss_; 
+                curseq_ += nb;
+
+    xpass_agent_->add_datalen(nb);
+
+		break;
+
+	default:
+            if (debug_) 
+	            fprintf(stderr, "%f: XPassTcpAgent::advance(%s): cannot advance while in state %s\n",
+		         now(), name(), statestr(state_));
+
+	}
+
+	if (state_ == TCPS_ESTABLISHED)
+		send_much(0, REASON_NORMAL, maxburst_);
+
+  	return;
+}
+
+
+
 /* XPassQueueAgent */
+
+int XPassQueueAgent::delay_bind_dispatch(const char *varName, const char *localName,
+                                    TclObject *tracer) {
+  if (delay_bind(varName, localName, "max_credit_rate_", &max_credit_rate_,
+                tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "alpha_", &alpha_, tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "min_credit_size_", &min_credit_size_,
+                 tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "max_credit_size_", &max_credit_size_,
+                 tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "min_ethernet_size_", &min_ethernet_size_,
+                 tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "max_ethernet_size_", &max_ethernet_size_,
+                 tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "xpass_hdr_size_", &xpass_hdr_size_,
+                 tracer)) {
+    printf("xpass_hdr_size_ = %d\n", xpass_hdr_size_);
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "target_loss_scaling_", &target_loss_scaling_,
+                 tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "w_init_", &w_init_, tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "min_w_", &min_w_, tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "retransmit_timeout_", &retransmit_timeout_,
+                 tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "default_credit_stop_timeout_", &default_credit_stop_timeout_,
+                 tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "max_jitter_", &max_jitter_, tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "min_jitter_", &min_jitter_, tracer)) {
+    return TCL_OK;
+  }
+  return 0;
+}
+
+
 bool XPassQueueAgent::recv_bool(Packet *pkt) {
   hdr_cmn *cmnh = hdr_cmn::access(pkt);
 
@@ -173,7 +303,7 @@ bool XPassQueueAgent::recv_bool(Packet *pkt) {
       recv_nack(pkt);
       break;
     default:
-      break;
+      return true;
   }
   Packet::free(pkt);
   return false;
@@ -284,7 +414,7 @@ void XPassQueueAgent::recv_data(Packet *pkt) {
   c_recv_next_ = xph->credit_seq() + 1;
 
   // no ack?
-  process_ack(pkt);
+  //process_ack(pkt);
   update_rtt(pkt);
 }
 Packet* XPassQueueAgent::construct_data(Packet *credit) {
@@ -322,7 +452,7 @@ Packet* XPassQueueAgent::construct_data(Packet *credit) {
   xph->credit_seq() = credit_xph->credit_seq();
   
   t_seqno_ += datalen;
-
+  packet_queue_.pop();
   return p;
 }
 
@@ -348,6 +478,8 @@ void XPassQueueAgent::advance_packets(Packet *p) {
 // drop packet if exceed max_packet_queue
   if (packet_queue_.size() < MAX_PACKET_QUEUE) {
     packet_queue_.push(p);
+    printf("Added to Packet Queue, cnt=%d\n", packet_queue_.size());
+
   } else {
     printf("Dropped from Packet Queue\n");
     return;
@@ -372,4 +504,9 @@ void XPassQueueAgent::advance_packets(Packet *p) {
   // XPASS_RECV_CLOSED -> XPASS_RECV_CREDIT_REQUEST_SENT
   credit_recv_state_ = XPASS_RECV_CREDIT_REQUEST_SENT;
 
+}
+
+void XPassQueueAgent::add_datalen(seq_t nb) {
+  curseq_ += nb;
+  printf("Add datalen, curseq = %ld, seqno = %ld\n", (long) curseq_, (long)t_seqno_);
 }
