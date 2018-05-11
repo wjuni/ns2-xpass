@@ -1279,6 +1279,22 @@ if [TclObject is-class Agent/TCP/FullTcp] {
 		set open_cwnd_on_pack_ false
 	}
 
+  Agent/TCP/FullTcp/XPass set min_credit_size_ 84
+    Agent/TCP/FullTcp/XPass set max_credit_size_ 84
+    Agent/TCP/FullTcp/XPass set min_ethernet_size_ 84
+    Agent/TCP/FullTcp/XPass set max_ethernet_size_ 1538
+    Agent/TCP/FullTcp/XPass set xpass_hdr_size_ 78
+    Agent/TCP/FullTcp/XPass set max_credit_rate_ 64734895 ;# for 10Gbps
+    Agent/TCP/FullTcp/XPass set alpha_ 0.5
+    Agent/TCP/FullTcp/XPass set target_loss_scaling_ 0.125
+    Agent/TCP/FullTcp/XPass set w_init_ 0.5
+    Agent/TCP/FullTcp/XPass set min_w_ 0.01
+    Agent/TCP/FullTcp/XPass set retransmit_timeout_ 0.1 ;# 100ms
+    Agent/TCP/FullTcp/XPass set default_credit_stop_timeout_ 0.002 ;# 2ms
+    Agent/TCP/FullTcp/XPass set min_jitter_ -0.1
+    Agent/TCP/FullTcp/XPass set max_jitter_ 0.1
+
+
 }
 
 if [TclObject is-class Agent/TCP/BayFullTcp] {
