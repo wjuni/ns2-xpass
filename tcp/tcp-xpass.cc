@@ -175,6 +175,7 @@ void XPassTcpAgent::recv_credit_request(Packet *pkt) {
       } else {
         lalpha = alpha_ * xph->sendbuffer_ / 40.0;
       }
+      
       cur_credit_rate_ = (int)(lalpha * max_credit_rate_);
       fst_ = xph->credit_sent_time();
       // need to start to send credits.
@@ -429,12 +430,12 @@ Packet* XPassTcpAgent::construct_data(Packet *credit) {
 
   Packet *p = packet_queue_.front();
 
-  //  hdr_tcp *tcph = hdr_tcp::access(p);
+  hdr_tcp *tcph = hdr_tcp::access(p);
   hdr_cmn *cmnh = hdr_cmn::access(p);
   hdr_xpass *xph = hdr_xpass::access(p);
   hdr_xpass *credit_xph = hdr_xpass::access(credit);
 
-  int datalen = cmnh->size();
+  int datalen = cmnh->size() - tcph->hlen();
   if (datalen <= 0) {
     fprintf(stderr, "ERROR: datapacket has length of less than zero\n");
     exit(1);
@@ -450,11 +451,11 @@ Packet* XPassTcpAgent::construct_data(Packet *credit) {
   // not calculate xpass_hdr_size (temp)
  //cmnh->size() = max(min_ethernet_size_, xpass_hdr_size_ + datalen);
   cmnh->ptype() = PT_XPASS_DATA;
-
+ 
   xph->credit_sent_time() = credit_xph->credit_sent_time();
   xph->credit_seq() = credit_xph->credit_seq();
-
   t_seqno_ += datalen;
+ // printf("Sending datalen=%d, now t_seqno_ = %d\n", datalen, t_seqno_);
   packet_queue_.pop();
  // printf("Process Queue Item\n");
   return p;
@@ -677,9 +678,9 @@ XPassTcpAgent::sendpacket(seq_t seqno, seq_t ackno, int pflags, int datalen, int
 
   if (pflags & (TH_SYN | TH_FIN) || datalen == 0){
     send(p, 0);
-    //printf("Send RAW, len:%d, ACK:%d, SYN:%d, FIN:%d\n", datalen, pflags & TH_ACK, pflags & TH_SYN, pflags & TH_FIN);
+    printf("Send RAW, len:%d, ACK:%d, SYN:%d, FIN:%d\n", datalen, pflags & TH_ACK, pflags & TH_SYN, pflags & TH_FIN);
   } else {
-    printf("Send advance, len:%d, seqno:%d\n", datalen, seqno);
+    printf("Send ADV, len:%d, seqno:%d, t_seqno_:%d\n", datalen, seqno, t_seqno_);
     advance_packets(p);
   }
 }
@@ -693,26 +694,26 @@ void XPassTcpAgent::advance_packets(Packet *p) {
  // tcph->seqno() = seqno;
 
 
-  if (packet_queue_.size() < MAX_PACKET_QUEUE) {
+//  if (packet_queue_.size() < MAX_PACKET_QUEUE) {
     packet_queue_.push(p);
     //printf("Added to Packet Queue\n");
-  } else {
-    //printf("Dropped from Packet Queue\n");
-    return;
-  }
+ // } else {
+  //  printf("Dropped from Packet Queue\n");
+  //  return;
+ // }
 
   //curseq_ += p->datalen();
 
   switch (credit_recv_state_) {
     case XPASS_RECV_CREDIT_REQUEST_SENT:
     case XPASS_RECV_CREDIT_RECEIVING:
-      return;
     case XPASS_RECV_CREDIT_STOP_SENT:
+     return;
     case XPASS_RECV_CLOSE_WAIT:
     case XPASS_RECV_CLOSED:
       break;
   }
- 
+ // printf("Credit_recv_state: %d, curseq_ = %d, t_seqno_ = %d\n", credit_recv_state_, curseq_, t_seqno_); 
   // send credit request
   send(construct_credit_request(), 0);
   sender_retransmit_timer_.sched(retransmit_timeout_);

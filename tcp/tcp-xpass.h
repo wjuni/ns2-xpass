@@ -166,7 +166,7 @@ protected:
   int credit_wasted_;
 
   inline double now() { return Scheduler::instance().clock(); }
-  seq_t datalen_remaining() {return (curseq_ - t_seqno_); }
+  seq_t datalen_remaining() {return (curseq_ - FullTcpAgent::t_seqno_); }
   int max_segment() { return (max_ethernet_size_ - xpass_hdr_size_); }
   int pkt_remaining() { return ceil(datalen_remaining()/(double)max_segment()); }
   double avg_credit_size() { return (min_credit_size_ + max_credit_size_)/2.0; }
