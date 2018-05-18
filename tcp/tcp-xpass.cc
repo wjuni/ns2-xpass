@@ -123,11 +123,13 @@ XPassTcpAgent::delay_bind_dispatch(const char *varName, const char *localName, T
   }
   return FullTcpAgent::delay_bind_dispatch(varName, localName, tracer);
 }
-
+static FILE *f_log;
 void XPassTcpAgent::init() {
   w_ = w_init_;
 //  cur_credit_rate_ = (int)(alpha_ * max_credit_rate_);
   last_credit_rate_update_ = now();
+  if(!f_log)
+    f_log = fopen("traces/log.txt", "a");
 }
 
 
@@ -357,7 +359,7 @@ Packet* XPassTcpAgent::construct_credit_request() {
   // to measure rtt between credit request and first credit
   // for sender.
   rtt_ = now();
-
+  
   return p;
 }
 
@@ -417,6 +419,8 @@ Packet* XPassTcpAgent::construct_credit() {
 
   c_seqno_ = max(1, c_seqno_+1);
 
+  fprintf(f_log, "%lf,%d,CREDIT_SENT\n", now(), fid_);
+  fflush(f_log);
   return p;
 }
 
@@ -678,9 +682,9 @@ XPassTcpAgent::sendpacket(seq_t seqno, seq_t ackno, int pflags, int datalen, int
 
   if (pflags & (TH_SYN | TH_FIN) || datalen == 0){
     send(p, 0);
-    printf("Send RAW, len:%d, ACK:%d, SYN:%d, FIN:%d\n", datalen, pflags & TH_ACK, pflags & TH_SYN, pflags & TH_FIN);
+    //printf("Send RAW, len:%d, ACK:%d, SYN:%d, FIN:%d\n", datalen, pflags & TH_ACK, pflags & TH_SYN, pflags & TH_FIN);
   } else {
-    printf("Send ADV, len:%d, seqno:%d, t_seqno_:%d\n", datalen, seqno, t_seqno_);
+    //printf("Send ADV, len:%d, seqno:%d, t_seqno_:%d\n", datalen, seqno, t_seqno_);
     advance_packets(p);
   }
 }
@@ -688,8 +692,7 @@ XPassTcpAgent::sendpacket(seq_t seqno, seq_t ackno, int pflags, int datalen, int
 
 void XPassTcpAgent::advance_packets(Packet *p) {
 // drop packet if exceed max_packet_queue
-
-  // later change to numbering
+    // later change to numbering
  // hdr_tcp *tcph = hdr_tcp::access(p);
  // tcph->seqno() = seqno;
 

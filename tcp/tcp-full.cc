@@ -126,6 +126,7 @@ static const char rcsid[] =
 #define	FALSE 	0
 #endif
 
+static FILE *f_log;
 /*
  * Tcl Linkage for the following:
  *	Agent/TCP/FullTcp, Agent/TCP/FullTcp/Tahoe,
@@ -821,7 +822,6 @@ FullTcpAgent::ack_action(Packet* p)
 	FullTcpAgent::pack_action(p);
 }
 
-
 /*
  * sendpacket: 
  *	allocate a packet, fill in header fields, and send
@@ -919,10 +919,9 @@ FullTcpAgent::sendpacket(seq_t seqno, seq_t ackno, int pflags, int datalen, int 
 //printf("%f(%s)[state:%s]: sending pkt ", now(), name(), statestr(state_));
 //prpkt(p);
 //}
-
+  
 	send(p, 0);
-
-	return;
+return;
 }
 
 //
@@ -2748,6 +2747,11 @@ void FullTcpAgent::update_dctcp_alpha(Packet *pkt)
     dctcp_alpha_ = (1 - dctcp_g_) * dctcp_alpha_ + dctcp_g_ * temp_alpha;
     dctcp_marked = 0;
     dctcp_total = 0;
+
+    if(!f_log)
+      f_log = fopen("traces/log.txt", "a");
+    fprintf(f_log, "%lf,%d,CWND,%d\n", now(), fid_, window());
+    fflush(f_log);
   }
 }
 

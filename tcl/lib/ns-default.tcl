@@ -211,6 +211,48 @@ Queue/RED/PD set unresponsive_penalty_ 1
 Queue/RED/PD set P_testFRp_ -1
 Queue/RED/PD set noidle_ false
 
+Queue/RED/XPass set bytes_ true ;		# default changed on 10/11/2004.
+Queue/RED/XPass set queue_in_bytes_ true ;	# default changed on 10/11/2004.
+Queue/RED/XPass set thresh_ 0
+Queue/RED/XPass set maxthresh_ 0
+Queue/RED/XPass set thresh_queue_ [Queue set limit_]
+Queue/RED/XPass set maxthresh_queue_ [Queue set limit_]
+Queue/RED/XPass set mean_pktsize_ 500
+Queue/RED/XPass set idle_pktsize_ 100
+Queue/RED/XPass set q_weight_ -1
+Queue/RED/XPass set wait_ true
+Queue/RED/XPass set linterm_ 10
+Queue/RED/XPass set mark_p_ 0.1
+Queue/RED/XPass set use_mark_p_ true
+Queue/RED/XPass set setbit_ false
+Queue/RED/XPass set gentle_ true
+Queue/RED/XPass set drop_tail_ true
+Queue/RED/XPass set drop_front_ false
+Queue/RED/XPass set drop_rand_ false
+Queue/RED/XPass set doubleq_ false
+Queue/RED/XPass set ns1_compat_ false
+Queue/RED/XPass set dqthresh_ 50
+Queue/RED/XPass set ave_ 0.0
+Queue/RED/XPass set prob1_ 0.0
+Queue/RED/XPass set curq_ 0
+Queue/RED/XPass set cur_max_p_ 0
+Queue/RED/XPass set summarystats_ false
+### Adaptive RED/XPass.
+Queue/RED/XPass set alpha_ 0.01
+Queue/RED/XPass set beta_ 0.9 
+Queue/RED/XPass set adaptive_ 0
+Queue/RED/XPass set interval_ 0.5
+Queue/RED/XPass set targetdelay_ 0.005
+Queue/RED/XPass set top_ 0.5
+Queue/RED/XPass set bottom_ 0
+Queue/RED/XPass set cautious_ 0
+Queue/RED/XPass set feng_adaptive_ 0
+Queue/RED/XPass set credit_limit_ [expr 84*10]
+Queue/RED/XPass set data_limit_ [expr 1538*100]
+Queue/RED/XPass set max_tokens_ [expr 84*10]
+Queue/RED/XPass set token_refresh_rate_ 64734895
+
+
 Queue/PI set bytes_ false
 Queue/PI set queue_in_bytes_ false
 Queue/PI set a_ 0.00001822
