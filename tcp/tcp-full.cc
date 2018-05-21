@@ -1588,6 +1588,11 @@ FullTcpAgent::recv(Packet *pkt, Handler*)
   if (dctcp_)
     update_dctcp_alpha(pkt);
 
+    if(!f_log)
+      f_log = fopen("traces/log.txt", "a");
+    fprintf(f_log, "%lf,%d,CWND,%d\n", now(), fid_, window());
+    fflush(f_log);
+ 
 	/*
 	 * Try header prediction: in seq data or in seq pure ACK
 	 *	with no funny business
@@ -2748,11 +2753,7 @@ void FullTcpAgent::update_dctcp_alpha(Packet *pkt)
     dctcp_marked = 0;
     dctcp_total = 0;
 
-    if(!f_log)
-      f_log = fopen("traces/log.txt", "a");
-    fprintf(f_log, "%lf,%d,CWND,%d\n", now(), fid_, window());
-    fflush(f_log);
-  }
+ }
 }
 
      
