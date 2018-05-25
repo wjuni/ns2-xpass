@@ -1587,13 +1587,13 @@ FullTcpAgent::recv(Packet *pkt, Handler*)
   
   if (dctcp_)
     update_dctcp_alpha(pkt);
-
-    if(!f_log)
+  if(!f_log)
       f_log = fopen("traces/log.txt", "a");
-    fprintf(f_log, "%lf,%d,CWND,%d\n", now(), fid_, window());
-    fflush(f_log);
+  fprintf(f_log, "%lf,%d,CWND,%d\n", now(), fid_, window());
+  fflush(f_log);
  
-	/*
+
+  	/*
 	 * Try header prediction: in seq data or in seq pure ACK
 	 *	with no funny business
 	 */
@@ -1702,6 +1702,7 @@ FullTcpAgent::recv(Packet *pkt, Handler*)
 			// of a receiver who always consumes data,
 			// resulting in a call to tcp_output
 			Packet::free(pkt);
+
 			if (need_send())
 				send_much(1, REASON_NORMAL, maxburst_);
 			return;
@@ -1718,7 +1719,7 @@ FullTcpAgent::recv(Packet *pkt, Handler*)
 	// the following switch does special things for these states:
 	//	TCPS_LISTEN, TCPS_SYN_SENT
 	//
-
+ 
 	switch (state_) {
 
         /*
@@ -2295,7 +2296,7 @@ trimthenstep6:
 		 * (i.e. received an ACK which advances highest_ack_)
 		 * The ACK may be "good" or "partial"
 		 */
-
+ 
 process_ACK:
 
 		if (ackno > maxseq_) {
@@ -2451,7 +2452,7 @@ process_ACK:
 		/* no case for TIME_WAIT in simulator */
 		}  // inner state_ switch (closing states)
 	} // outer state_ switch (ack processing)
-
+ 
 step6:
 
 	/*
@@ -2604,7 +2605,7 @@ step6:
 	// send_much() (an ACK)
 	if (state_ == TCPS_CLOSED) 
 		Tcl::instance().evalf("%s done", this->name());
-
+ 
 	return;
 
 	//
@@ -2651,7 +2652,7 @@ drop:
 void
 FullTcpAgent::dupack_action()
 {   
-
+  
         int recovered = (highest_ack_ > recover_);
 
 	fastrecov_ = TRUE;
@@ -2697,8 +2698,8 @@ void
 FullTcpAgent::timeout_action()
 {
 	recover_ = maxseq_;
-
-	if (cwnd_ < 1.0) {
+	
+  if (cwnd_ < 1.0) {
                 if (debug_) {
 	            fprintf(stderr, "%f: FullTcpAgent(%s):: resetting cwnd from %f to 1\n",
 		    now(), name(), double(cwnd_));
@@ -2752,8 +2753,7 @@ void FullTcpAgent::update_dctcp_alpha(Packet *pkt)
     dctcp_alpha_ = (1 - dctcp_g_) * dctcp_alpha_ + dctcp_g_ * temp_alpha;
     dctcp_marked = 0;
     dctcp_total = 0;
-
- }
+  }
 }
 
      

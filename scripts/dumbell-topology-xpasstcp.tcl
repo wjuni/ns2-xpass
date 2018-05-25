@@ -38,7 +38,7 @@ Agent/TCP set tcpip_base_hdr_size_ 84
 
 Agent/TCP set dctcp_ false
 Agent/TCP set dctcp_g_ $DCTCP_g_;
-#Agent/TCP set maxcwnd_ 1
+Agent/TCP set maxcwnd_ 1500
 
 Agent/TCP/FullTcp set segsperack_ $ackRatio; 
 Agent/TCP/FullTcp set spa_thresh_ 3000;
@@ -123,8 +123,8 @@ for {set i 0} {$i < $N} {incr i} {
 	  set sink($i) [new Agent/TCP/FullTcp/XPass]
   } else {
     # send dctcp when i=0
-    set tcp($i) [new Agent/TCP/FullTcp/XPass]
-	  set sink($i) [new Agent/TCP/FullTcp/XPass]
+    set tcp($i) [new Agent/TCP/FullTcp]
+	  set sink($i) [new Agent/TCP/FullTcp]
   }
   
   $sink($i) listen
