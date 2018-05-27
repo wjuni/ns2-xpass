@@ -289,32 +289,47 @@ void XPassAgent::recv_data(Packet *pkt) {
 
   if (distance < 0) {
     // credit packet reordering or credit sequence number overflow happend.
-    //printf("new_seq: %d, c_recv_next_:%d, credit_total_:%d, credit_dropped:%d \n", new_seq, c_recv_next_, credit_total_, credit_dropped_);
+    printf("new_seq: %d, c_recv_next_:%d, credit_total_:%d, credit_dropped:%d \n", new_seq, c_recv_next_, credit_total_, credit_dropped_);
     return;
     fprintf(stderr, "ERROR: Credit Sequence number is reverted.\n");
     exit(1);
   }
-
+ 
   if (new_seq == c_recv_next_) {
     c_recv_next_ += 1;
     credit_total_ += 1;
     shift_c_seq_queue(1);
+      printf("Filling queue at pos=%d, new_seq=%d, filled=%d, credit_total=%d, credit_dropped=%d, c_recv_next=%d\n", new_seq - c_recv_next_, new_seq, num_c_queue_filled_, credit_total_, credit_dropped_, c_recv_next_);
+   while(c_recv_next_queue_ & 0x01) {
+     shift_c_seq_queue(1);
+     num_c_queue_filled_ -= 1;
+     c_recv_next_ += 1;
+     credit_total_ += 1;
+     printf("Auto-emptying(1), filled=%d\n", num_c_queue_filled_);
+   }
+      
+      process_ack(pkt);
+  update_rtt(pkt);
     return;
   }
 
   int num_dropped = 0;
   // if there are credit burst drops
-  if (new_seq - c_recv_next_ >= CREDIT_BURST_SIZE) {
-    seq_t new_c_recv_next = new_seq - CREDIT_BURST_SIZE + 1;
+  if (new_seq - c_recv_next_ >= CREDIT_BURST_SIZE*2) {
+   printf("CREDIT BURST CHECK : new_seq = %d, c_recv_next_ = %d, diff=%d, CBS=%d\n", new_seq, c_recv_next_, new_seq - c_recv_next_, CREDIT_BURST_SIZE*2);
+    seq_t new_c_recv_next = new_seq - CREDIT_BURST_SIZE*2 + 1;
     int jump = new_c_recv_next - c_recv_next_;
-    if (jump > CREDIT_BURST_SIZE - 1) {
+    if (jump > CREDIT_BURST_SIZE*2 - 1) {
        num_dropped = (new_c_recv_next - c_recv_next_ - num_c_queue_filled_);
        credit_dropped_ += num_dropped;
        credit_total_ += (num_dropped + 1);
        c_recv_next_ = new_c_recv_next;
        c_recv_next_queue_ = 0;
        num_c_queue_filled_ = 0;
-       return;
+   process_ack(pkt);
+  update_rtt(pkt);
+  printf("Credit dropped = %d, empty queue\n", credit_dropped_);
+    return;
     }
     
     for(int i=0; i<jump; i++) {
@@ -325,29 +340,39 @@ void XPassAgent::recv_data(Packet *pkt) {
     credit_dropped_ += num_dropped;
     credit_total_ += (num_dropped + 1);
    
+  printf("Credit dropped = %d\n", credit_dropped_);
     int c=0;
-    for(int i=jump;i<CREDIT_BURST_SIZE;i++) {
+    for(int i=jump;i<CREDIT_BURST_SIZE*2;i++) {
       if(c_seq_queue_item(i)==0){
         c_recv_next_ += i;
-        jump++;
+        //jump++;
         c = 1;
         break;
       }
     }
     if (c==0) {
-      c_recv_next_ += CREDIT_BURST_SIZE;
-      jump = CREDIT_BURST_SIZE;
+      c_recv_next_ += CREDIT_BURST_SIZE*2;
+      jump = CREDIT_BURST_SIZE*2;
     }
     shift_c_seq_queue(jump);
+    assert(!(0x00000001 << (new_seq - c_recv_next_)));
     c_recv_next_queue_ = c_recv_next_queue_ | (0x00000001 << (new_seq - c_recv_next_));
     cal_c_queue_filled();
   }
   else {
+    assert(!(0x00000001 << (new_seq - c_recv_next_)));
     c_recv_next_queue_ = c_recv_next_queue_ | (0x00000001 << (new_seq - c_recv_next_));
     num_c_queue_filled_++;
     credit_total_++;
+     printf("Filling queue at pos=%d, new_seq=%d, filled=%d, credit_total=%d, credit_dropped=%d, c_recv_next=%d\n", new_seq - c_recv_next_, new_seq, num_c_queue_filled_, credit_total_, credit_dropped_, c_recv_next_);
   }
-
+ while(c_recv_next_queue_ & 0x01) {
+     shift_c_seq_queue(1);
+     num_c_queue_filled_ -= 1;
+     c_recv_next_ += 1;
+     credit_total_ += 1;
+     printf("Auto-emptying(2), filled=%d, c_recv_next=%d\n", num_c_queue_filled_, c_recv_next_);
+   }
   process_ack(pkt);
   update_rtt(pkt);
 }
@@ -520,7 +545,6 @@ Packet* XPassAgent::construct_credit() {
   xph->credit_seq() = c_seqno_;
 
   xph->cos() = randomize_cos(c_seqno_);
-
   c_seqno_ = max(1, c_seqno_+1);
 
   return p;
@@ -579,21 +603,21 @@ Packet* XPassAgent::construct_nack(seq_t seq_no) {
 void XPassAgent::send_credit() {
   //double avg_credit_size = (min_credit_size_ + max_credit_size_)/2.0;
   double delay;
-
   credit_feedback_control();
+  if(credit_cnt_timing_ % CREDIT_BURST_SIZE == 0) {
+   // send credit.
+    send(construct_credit(), 0);
+    credit_cnt_++;
 
-  // send credit.
-  send(construct_credit(), 0);
-  credit_cnt_++;
-
-  if(credit_cnt_ % CREDIT_BURST_SIZE != 0) {
-    // resend credit without delay
-    send_credit_timer_.resched(0);
-    return;
+    if(credit_cnt_ % CREDIT_BURST_SIZE != 0) {
+      // resend credit without delay
+      send_credit_timer_.resched(0);
+      return;
+    }
   }
-    
+
   // calculate delay for next credit transmission.
-  delay = avg_credit_size() / cur_credit_rate_ * CREDIT_BURST_SIZE;
+  delay = avg_credit_size() / cur_credit_rate_;
   // add jitter
   if (max_jitter_ > min_jitter_) {
     double jitter = (double)rand()/(double)RAND_MAX;
@@ -604,7 +628,7 @@ void XPassAgent::send_credit() {
     fprintf(stderr, "ERROR: max_jitter_ should be larger than min_jitter_");
     exit(1);
   }
-
+  credit_cnt_timing_++;
   send_credit_timer_.resched(delay);
 }
 
@@ -674,7 +698,8 @@ int XPassAgent::randomize_cos(int seqno) {
   srand(seqno);
   int temp = (int)(now()*10000);
   srand(rand()^temp);
-  return rand() % credit_queue_count_;
+//  return rand() % credit_queue_count_;
+  return seqno % credit_queue_count_;
 }
 
 // set num_c_queue_filled as the number of 1 bits in c_recv_next_queue_
@@ -703,6 +728,7 @@ void XPassAgent::credit_feedback_control() {
 
   if (loss_rate > target_loss) {
     // congestion has been detected!
+    printf("Congestion detected. dropped credit = %d, credit_total = %d\n", credit_dropped_, credit_total_);
     if (loss_rate >= 1.0) {
       cur_credit_rate_ = (int)(avg_credit_size() / rtt_);
     } else {
@@ -718,6 +744,7 @@ void XPassAgent::credit_feedback_control() {
     can_increase_w_ = false;
   }else {
     // there is no congestion.
+    printf("Congestion not detected. dropped credit = %d, credit_total = %d\n", credit_dropped_, credit_total_);
     if (can_increase_w_) {
       w_ = min(w_ + 0.05, 0.5);
     }else {

@@ -3,7 +3,7 @@
 
 #include "queue.h"
 #include "timer-handler.h"
-
+#include "xpass/xpass.h"
 class XPassDropTail;
 class CreditTimer: public TimerHandler {
 public:

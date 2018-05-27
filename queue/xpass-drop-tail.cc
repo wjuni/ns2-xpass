@@ -53,15 +53,18 @@ void XPassDropTail::enque(Packet* p) {
   }
   // parsing headers.
   hdr_cmn* cmnh = hdr_cmn::access(p);
-
+  hdr_xpass *xph = hdr_xpass::access(p);
+  int cos = xph->cos();
   // enqueue packet: store and forward.
   if (cmnh->ptype() == PT_XPASS_CREDIT) {
     // p is credit packet.
-    credit_q_[c_queue_num_].enque(p);
-    if (credit_q_[c_queue_num_].byteLength() > credit_q_limit_) {
-      credit_q_[c_queue_num_].remove(p);
+    credit_q_[cos].enque(p);
+    if (credit_q_[cos].byteLength() > credit_q_limit_) {
+       printf("Credit drop from queue=%d, bytelen=%d, q_lim=%d\n", cos,
+          credit_q_[cos].byteLength(), credit_q_limit_);
+      credit_q_[cos].remove(p);
       drop(p);
-    }
+   }
   }else {
     // p is data packet.
     data_q_->enque(p);
