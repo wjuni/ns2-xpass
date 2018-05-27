@@ -1,7 +1,7 @@
 set ns [new Simulator]
 
-if {$argc < 2} {
-  puts "USAGE: ./ns scripts/dumbell-topology.tcl {N} {exp_id}"
+if {$argc < 3} {
+  puts "USAGE: ./ns scripts/dumbell-topology.tcl {N} {exp_id} {credit_queue_count}"
   exit 1
 }
 
@@ -12,10 +12,11 @@ set w_init 0.5
 set linkBW 10Gb
 set inputlinkBW 10Gb
 set linkLatency 10us
-set creditQueueCapacity [expr 84*32]  ;# bytes
+set creditQueueCount [expr int([lindex $argv 2])]
+set creditQueueCapacity [expr 84*2]  ;# bytes
 set dataQueueCapacity [expr 1538*100] ;# bytes
 set hostQueueCapacity [expr 1538*100] ;# bytes
-set maxCrditBurst [expr 84*2] ;# bytes
+set maxCrditBurst [expr 84*16] ;# bytes
 set creditRate 64734895 ;# bytes / sec
 set expID [expr int([lindex $argv 1])]
 
@@ -62,6 +63,7 @@ Queue/DropTail set qlim_ [expr $hostQueueCapacity/1538]
 Queue/XPassDropTail set credit_limit_ $creditQueueCapacity
 Queue/XPassDropTail set data_limit_ $dataQueueCapacity
 Queue/XPassDropTail set token_refresh_rate_ $creditRate
+Queue/XPassDropTail set credit_queue_count_ $creditQueueCount
 
 for {set i 0} {$i < $N} {incr i} {
   $ns simplex-link $left_node($i) $left_gateway $inputlinkBW $linkLatency DropTail
@@ -79,6 +81,7 @@ Agent/XPass set max_credit_rate_ $creditRate
 Agent/XPass set cur_credit_rate_ [expr $ALPHA*$creditRate]
 Agent/XPass set w_ $w_init
 Agent/XPass set exp_id_ $expID
+Agent/XPass set credit_queue_count_ $creditQueueCount
 
 for {set i 0} {$i < $N} {incr i} {
   set sender($i) [new Agent/XPass]

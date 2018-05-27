@@ -19,26 +19,31 @@ public:
   XPassDropTail(): credit_timer_(this) {
     // Separate Queues: data queue & credit queue
     data_q_ = new PacketQueue;
-    credit_q_ = new PacketQueue;
 
     // bind with TCL
     bind("credit_limit_", &credit_q_limit_);
     bind("data_limit_", &data_q_limit_);
     bind("max_tokens_", &max_tokens_);
     bind("token_refresh_rate_", &token_refresh_rate_);
+    bind("credit_queue_count_", &credit_queue_count_);
 
+    credit_q_ = new PacketQueue[credit_queue_count_];
+    
     // Init variables
     tokens_ = 0;
     token_bucket_clock_ = 0;
+    c_queue_num_ = 0;
+    c_queue_clock_ = 0;
   }
   ~XPassDropTail() {
     delete data_q_;
-    delete credit_q_;
+    delete [] credit_q_;
   }
 protected:
   void enque(Packet*);
   Packet* deque();
   void updateTokenBucket();
+  void updateCreditQueue();
   void expire();
 
   // Queue Related Varaibles
@@ -63,6 +68,11 @@ protected:
   // Token Refresh Rate (in bytes per sec)
   // == Credit Throttling Rate
   double token_refresh_rate_;
+
+  int credit_queue_count_;
+  // credit queue number
+  int c_queue_num_;
+  double c_queue_clock_;
 
   // Credit timer to trigger next credit transmission
   CreditTimer credit_timer_;

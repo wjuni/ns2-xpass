@@ -63,6 +63,7 @@ void XPassAgent::delay_bind_init_all() {
   delay_bind_init_one("dynamic_target_loss_");
   delay_bind_init_one("initial_credit_rate_");
   delay_bind_init_one("exp_id_");
+  delay_bind_init_one("credit_queue_count_");
   Agent::delay_bind_init_all();
 }
 
@@ -132,6 +133,9 @@ int XPassAgent::delay_bind_dispatch(const char *varName, const char *localName,
     return TCL_OK;
   }
   if (delay_bind(varName, localName, "exp_id_", &exp_id_, tracer)) {
+    return TCL_OK;
+  }
+  if (delay_bind(varName, localName, "credit_queue_count_", &credit_queue_count_, tracer)) {
     return TCL_OK;
   }
   return Agent::delay_bind_dispatch(varName, localName, tracer);
@@ -208,6 +212,7 @@ void XPassAgent::recv_credit_request(Packet *pkt) {
         lalpha = alpha_ * xph->sendbuffer_ / 40.0;
       } 
       cur_credit_rate_ = (int)(lalpha * initial_credit_rate_);
+      
       fst_ = xph->credit_sent_time();
       // need to start to send credits.
       send_credit();
@@ -276,18 +281,72 @@ void XPassAgent::recv_credit(Packet *pkt) {
 
 void XPassAgent::recv_data(Packet *pkt) {
   hdr_xpass *xph = hdr_xpass::access(pkt);
+  seq_t new_seq = xph->credit_seq();
+
+  //printf("new_seq: %d, c_recv_next_:%d, c_recv_next_queue_:%X, credit_total_:%d, credit_dropped:%d, filled:%d, now:%f \n", new_seq, c_recv_next_, c_recv_next_queue_, credit_total_, credit_dropped_, num_c_queue_filled_, now());
   // distance between expected sequence number and actual sequence number.
   int distance = xph->credit_seq() - c_recv_next_;
 
   if (distance < 0) {
     // credit packet reordering or credit sequence number overflow happend.
+    //printf("new_seq: %d, c_recv_next_:%d, credit_total_:%d, credit_dropped:%d \n", new_seq, c_recv_next_, credit_total_, credit_dropped_);
+    return;
     fprintf(stderr, "ERROR: Credit Sequence number is reverted.\n");
     exit(1);
   }
-  credit_total_ += (distance + 1);
-  credit_dropped_ += distance;
 
-  c_recv_next_ = xph->credit_seq() + 1;
+  if (new_seq == c_recv_next_) {
+    c_recv_next_ += 1;
+    credit_total_ += 1;
+    shift_c_seq_queue(1);
+    return;
+  }
+
+  int num_dropped = 0;
+  // if there are credit burst drops
+  if (new_seq - c_recv_next_ >= CREDIT_BURST_SIZE) {
+    seq_t new_c_recv_next = new_seq - CREDIT_BURST_SIZE + 1;
+    int jump = new_c_recv_next - c_recv_next_;
+    if (jump > CREDIT_BURST_SIZE - 1) {
+       num_dropped = (new_c_recv_next - c_recv_next_ - num_c_queue_filled_);
+       credit_dropped_ += num_dropped;
+       credit_total_ += (num_dropped + 1);
+       c_recv_next_ = new_c_recv_next;
+       c_recv_next_queue_ = 0;
+       num_c_queue_filled_ = 0;
+       return;
+    }
+    
+    for(int i=0; i<jump; i++) {
+      if(c_seq_queue_item(i)==0) {
+        num_dropped++;
+      }
+    }
+    credit_dropped_ += num_dropped;
+    credit_total_ += (num_dropped + 1);
+   
+    int c=0;
+    for(int i=jump;i<CREDIT_BURST_SIZE;i++) {
+      if(c_seq_queue_item(i)==0){
+        c_recv_next_ += i;
+        jump++;
+        c = 1;
+        break;
+      }
+    }
+    if (c==0) {
+      c_recv_next_ += CREDIT_BURST_SIZE;
+      jump = CREDIT_BURST_SIZE;
+    }
+    shift_c_seq_queue(jump);
+    c_recv_next_queue_ = c_recv_next_queue_ | (0x00000001 << (new_seq - c_recv_next_));
+    cal_c_queue_filled();
+  }
+  else {
+    c_recv_next_queue_ = c_recv_next_queue_ | (0x00000001 << (new_seq - c_recv_next_));
+    num_c_queue_filled_++;
+    credit_total_++;
+  }
 
   process_ack(pkt);
   update_rtt(pkt);
@@ -299,9 +358,13 @@ void XPassAgent::recv_nack(Packet *pkt) {
     case XPASS_RECV_CREDIT_STOP_SENT:
     case XPASS_RECV_CLOSE_WAIT:
     case XPASS_RECV_CLOSED:
-      send(construct_credit_request(), 0);
-      credit_recv_state_ = XPASS_RECV_CREDIT_REQUEST_SENT;
-      sender_retransmit_timer_.resched(retransmit_timeout_);
+      if (datalen_remaining() > 0){
+        send(construct_credit_request(), 0);
+        credit_recv_state_ = XPASS_RECV_CREDIT_REQUEST_SENT;
+        sender_retransmit_timer_.resched(retransmit_timeout_);
+      } else {
+        /////
+      }
     case XPASS_RECV_CREDIT_REQUEST_SENT:
     case XPASS_RECV_CREDIT_RECEIVING:
       // set t_seqno_ for retransmission
@@ -456,6 +519,8 @@ Packet* XPassAgent::construct_credit() {
   xph->credit_sent_time() = now();
   xph->credit_seq() = c_seqno_;
 
+  xph->cos() = randomize_cos(c_seqno_);
+
   c_seqno_ = max(1, c_seqno_+1);
 
   return p;
@@ -512,7 +577,7 @@ Packet* XPassAgent::construct_nack(seq_t seq_no) {
 }
 
 void XPassAgent::send_credit() {
-  double avg_credit_size = (min_credit_size_ + max_credit_size_)/2.0;
+  //double avg_credit_size = (min_credit_size_ + max_credit_size_)/2.0;
   double delay;
 
   credit_feedback_control();
@@ -528,7 +593,7 @@ void XPassAgent::send_credit() {
   }
     
   // calculate delay for next credit transmission.
-  delay = avg_credit_size / cur_credit_rate_ * CREDIT_BURST_SIZE;
+  delay = avg_credit_size() / cur_credit_rate_ * CREDIT_BURST_SIZE;
   // add jitter
   if (max_jitter_ > min_jitter_) {
     double jitter = (double)rand()/(double)RAND_MAX;
@@ -578,8 +643,8 @@ void XPassAgent::process_ack(Packet *pkt) {
     exit(1);
   }
   if (tcph->seqno() > recv_next_) {
-    printf("[%d] %lf: data loss detected. (expected = %ld, received = %ld)\n",
-           fid_, now(), recv_next_, tcph->seqno());
+   ///// printf("[%d] %lf: data loss detected. (expected = %ld, received = %ld)\n",
+   ////        fid_, now(), recv_next_, tcph->seqno());
     if (!wait_retransmission_) {
       wait_retransmission_ = true;
       send(construct_nack(recv_next_), 0);
@@ -604,6 +669,21 @@ void XPassAgent::update_rtt(Packet *pkt) {
     rtt_ = rtt;
   }
 }
+
+int XPassAgent::randomize_cos(int seqno) {
+  srand(seqno);
+  int temp = (int)(now()*10000);
+  srand(rand()^temp);
+  return rand() % credit_queue_count_;
+}
+
+// set num_c_queue_filled as the number of 1 bits in c_recv_next_queue_
+void XPassAgent::cal_c_queue_filled() {
+  uint32_t temp = c_recv_next_queue_ - ((c_recv_next_queue_ >> 1) & 0x55555555);
+  temp = (temp & 0x33333333) + ((temp >> 2) & 0x33333333);
+  num_c_queue_filled_ = (((temp + (temp >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
+}
+
 #ifdef XPASS_CFC_ORIGINAL
 void XPassAgent::credit_feedback_control() {
   if (rtt_ <= 0.0) {
@@ -647,7 +727,7 @@ void XPassAgent::credit_feedback_control() {
       cur_credit_rate_ = (int)(w_*max_credit_rate_ + (1-w_)*cur_credit_rate_);
     }
   }
-
+  
   if (cur_credit_rate_ > max_credit_rate_) {
     cur_credit_rate_ = max_credit_rate_;
   }
