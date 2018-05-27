@@ -317,7 +317,7 @@ void XPassAgent::recv_data(Packet *pkt) {
   // if there are credit burst drops
   if (new_seq - c_recv_next_ >= CREDIT_BURST_SIZE*2) {
    printf("CREDIT BURST CHECK : new_seq = %d, c_recv_next_ = %d, diff=%d, CBS=%d\n", new_seq, c_recv_next_, new_seq - c_recv_next_, CREDIT_BURST_SIZE*2);
-    seq_t new_c_recv_next = new_seq - CREDIT_BURST_SIZE*2 + 1;
+    seq_t new_c_recv_next = new_seq + 1;//- CREDIT_BURST_SIZE*2 + 1;
     int jump = new_c_recv_next - c_recv_next_;
     if (jump > CREDIT_BURST_SIZE*2 - 1) {
        num_dropped = (new_c_recv_next - c_recv_next_ - num_c_queue_filled_);
