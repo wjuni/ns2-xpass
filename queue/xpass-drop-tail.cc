@@ -46,6 +46,7 @@ void XPassDropTail::updateTokenBucket() {
   token_bucket_clock_ += new_tokens / token_refresh_rate_;
 }
 
+//COS
 // Enqueue when a new packet has arrived.
 void XPassDropTail::enque(Packet* p) {
   if (p == NULL) {
@@ -60,8 +61,6 @@ void XPassDropTail::enque(Packet* p) {
     // p is credit packet.
     credit_q_[cos].enque(p);
     if (credit_q_[cos].byteLength() > credit_q_limit_) {
-       printf("Credit drop from queue=%d, bytelen=%d, q_lim=%d\n", cos,
-          credit_q_[cos].byteLength(), credit_q_limit_);
       credit_q_[cos].remove(p);
       drop(p);
    }
@@ -76,6 +75,7 @@ void XPassDropTail::enque(Packet* p) {
   }
 }
 
+//COS
 // Dequeue the packets.
 // Data has higher priority than credit packets.
 Packet* XPassDropTail::deque() {
@@ -114,6 +114,7 @@ Packet* XPassDropTail::deque() {
   return NULL;
 }
 
+//COS
 void XPassDropTail::updateCreditQueue() {
   double now = Scheduler::instance().clock();
   double elapsed_time = now - c_queue_clock_;

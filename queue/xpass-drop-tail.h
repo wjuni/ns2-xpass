@@ -27,6 +27,7 @@ public:
     bind("token_refresh_rate_", &token_refresh_rate_);
     bind("credit_queue_count_", &credit_queue_count_);
 
+    //COS
     credit_q_ = new PacketQueue[credit_queue_count_];
     
     // Init variables
@@ -37,7 +38,7 @@ public:
   }
   ~XPassDropTail() {
     delete data_q_;
-    delete [] credit_q_;
+    delete [] credit_q_;//COS
   }
 protected:
   void enque(Packet*);
@@ -50,6 +51,8 @@ protected:
   //
   // Queue for data packets (High priority)
   PacketQueue *data_q_;
+
+  //COS
   // Queue for credit packets (Low priority)
   PacketQueue *credit_q_;
   // Maximum size of credit queue (in bytes)

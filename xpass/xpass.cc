@@ -63,6 +63,7 @@ void XPassAgent::delay_bind_init_all() {
   delay_bind_init_one("dynamic_target_loss_");
   delay_bind_init_one("initial_credit_rate_");
   delay_bind_init_one("exp_id_");
+  //COS
   delay_bind_init_one("credit_queue_count_");
   Agent::delay_bind_init_all();
 }
@@ -279,59 +280,50 @@ void XPassAgent::recv_credit(Packet *pkt) {
   }
 }
 
+//COS
 void XPassAgent::recv_data(Packet *pkt) {
   hdr_xpass *xph = hdr_xpass::access(pkt);
   seq_t new_seq = xph->credit_seq();
 
-  //printf("new_seq: %d, c_recv_next_:%d, c_recv_next_queue_:%X, credit_total_:%d, credit_dropped:%d, filled:%d, now:%f \n", new_seq, c_recv_next_, c_recv_next_queue_, credit_total_, credit_dropped_, num_c_queue_filled_, now());
   // distance between expected sequence number and actual sequence number.
   int distance = xph->credit_seq() - c_recv_next_;
-
   if (distance < 0) {
     // credit packet reordering or credit sequence number overflow happend.
-    printf("new_seq: %d, c_recv_next_:%d, credit_total_:%d, credit_dropped:%d \n", new_seq, c_recv_next_, credit_total_, credit_dropped_);
     return;
-    fprintf(stderr, "ERROR: Credit Sequence number is reverted.\n");
-    exit(1);
   }
- 
+
   if (new_seq == c_recv_next_) {
     c_recv_next_ += 1;
     credit_total_ += 1;
     shift_c_seq_queue(1);
-      printf("Filling queue at pos=%d, new_seq=%d, filled=%d, credit_total=%d, credit_dropped=%d, c_recv_next=%d\n", new_seq - c_recv_next_, new_seq, num_c_queue_filled_, credit_total_, credit_dropped_, c_recv_next_);
-   while(c_recv_next_queue_ & 0x01) {
-     shift_c_seq_queue(1);
-     num_c_queue_filled_ -= 1;
-     c_recv_next_ += 1;
-     credit_total_ += 1;
-     printf("Auto-emptying(1), filled=%d\n", num_c_queue_filled_);
-   }
-      
-      process_ack(pkt);
-  update_rtt(pkt);
+    while(c_recv_next_queue_ & 0x01) {
+      shift_c_seq_queue(1);
+      num_c_queue_filled_ -= 1;
+      c_recv_next_ += 1;
+      credit_total_ += 1;
+    }
+    process_ack(pkt);
+    update_rtt(pkt);
     return;
   }
 
   int num_dropped = 0;
   // if there are credit burst drops
   if (new_seq - c_recv_next_ >= CREDIT_BURST_SIZE*2) {
-   printf("CREDIT BURST CHECK : new_seq = %d, c_recv_next_ = %d, diff=%d, CBS=%d\n", new_seq, c_recv_next_, new_seq - c_recv_next_, CREDIT_BURST_SIZE*2);
-    seq_t new_c_recv_next = new_seq + 1;//- CREDIT_BURST_SIZE*2 + 1;
+    seq_t new_c_recv_next = new_seq + 1;
     int jump = new_c_recv_next - c_recv_next_;
     if (jump > CREDIT_BURST_SIZE*2 - 1) {
-       num_dropped = (new_c_recv_next - c_recv_next_ - num_c_queue_filled_);
-       credit_dropped_ += num_dropped;
-       credit_total_ += (num_dropped + 1);
-       c_recv_next_ = new_c_recv_next;
-       c_recv_next_queue_ = 0;
-       num_c_queue_filled_ = 0;
-   process_ack(pkt);
-  update_rtt(pkt);
-  printf("Credit dropped = %d, empty queue\n", credit_dropped_);
-    return;
+      num_dropped = (new_c_recv_next - c_recv_next_ - num_c_queue_filled_);
+      credit_dropped_ += num_dropped;
+      credit_total_ += (num_dropped + 1);
+      c_recv_next_ = new_c_recv_next;
+      c_recv_next_queue_ = 0;
+      num_c_queue_filled_ = 0;
+      process_ack(pkt);
+      update_rtt(pkt);
+      return;
     }
-    
+
     for(int i=0; i<jump; i++) {
       if(c_seq_queue_item(i)==0) {
         num_dropped++;
@@ -339,13 +331,11 @@ void XPassAgent::recv_data(Packet *pkt) {
     }
     credit_dropped_ += num_dropped;
     credit_total_ += (num_dropped + 1);
-   
-  printf("Credit dropped = %d\n", credit_dropped_);
+    
     int c=0;
     for(int i=jump;i<CREDIT_BURST_SIZE*2;i++) {
       if(c_seq_queue_item(i)==0){
         c_recv_next_ += i;
-        //jump++;
         c = 1;
         break;
       }
@@ -358,25 +348,23 @@ void XPassAgent::recv_data(Packet *pkt) {
     assert(!(0x00000001 << (new_seq - c_recv_next_)));
     c_recv_next_queue_ = c_recv_next_queue_ | (0x00000001 << (new_seq - c_recv_next_));
     cal_c_queue_filled();
-  }
-  else {
+  } else {
     assert(!(0x00000001 << (new_seq - c_recv_next_)));
     c_recv_next_queue_ = c_recv_next_queue_ | (0x00000001 << (new_seq - c_recv_next_));
     num_c_queue_filled_++;
     credit_total_++;
-     printf("Filling queue at pos=%d, new_seq=%d, filled=%d, credit_total=%d, credit_dropped=%d, c_recv_next=%d\n", new_seq - c_recv_next_, new_seq, num_c_queue_filled_, credit_total_, credit_dropped_, c_recv_next_);
   }
- while(c_recv_next_queue_ & 0x01) {
-     shift_c_seq_queue(1);
-     num_c_queue_filled_ -= 1;
-     c_recv_next_ += 1;
-     credit_total_ += 1;
-     printf("Auto-emptying(2), filled=%d, c_recv_next=%d\n", num_c_queue_filled_, c_recv_next_);
-   }
+  while(c_recv_next_queue_ & 0x01) {
+    shift_c_seq_queue(1);
+    num_c_queue_filled_ -= 1;
+    c_recv_next_ += 1;
+    credit_total_ += 1;
+  }
   process_ack(pkt);
   update_rtt(pkt);
 }
 
+//COS(?)
 void XPassAgent::recv_nack(Packet *pkt) {
   hdr_tcp *tcph = hdr_tcp::access(pkt);
   switch (credit_recv_state_) {
@@ -512,6 +500,7 @@ Packet* XPassAgent::construct_credit_stop() {
   return p;
 }
 
+//COS
 Packet* XPassAgent::construct_credit() {
   Packet *p = allocpkt();
   if (!p) {
@@ -600,8 +589,8 @@ Packet* XPassAgent::construct_nack(seq_t seq_no) {
   return p;
 }
 
+//COS
 void XPassAgent::send_credit() {
-  //double avg_credit_size = (min_credit_size_ + max_credit_size_)/2.0;
   double delay;
   credit_feedback_control();
   if(credit_cnt_timing_ % CREDIT_BURST_SIZE == 0) {
@@ -667,8 +656,6 @@ void XPassAgent::process_ack(Packet *pkt) {
     exit(1);
   }
   if (tcph->seqno() > recv_next_) {
-   ///// printf("[%d] %lf: data loss detected. (expected = %ld, received = %ld)\n",
-   ////        fid_, now(), recv_next_, tcph->seqno());
     if (!wait_retransmission_) {
       wait_retransmission_ = true;
       send(construct_nack(recv_next_), 0);
@@ -694,6 +681,7 @@ void XPassAgent::update_rtt(Packet *pkt) {
   }
 }
 
+//COS
 int XPassAgent::randomize_cos(int seqno) {
   srand(seqno);
   int temp = (int)(now()*10000);
@@ -702,6 +690,7 @@ int XPassAgent::randomize_cos(int seqno) {
   return seqno % credit_queue_count_;
 }
 
+//COS
 // set num_c_queue_filled as the number of 1 bits in c_recv_next_queue_
 void XPassAgent::cal_c_queue_filled() {
   uint32_t temp = c_recv_next_queue_ - ((c_recv_next_queue_ >> 1) & 0x55555555);

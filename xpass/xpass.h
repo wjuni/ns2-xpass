@@ -114,9 +114,9 @@ public:
                 send_credit_timer_(this), credit_stop_timer_(this), 
                 sender_retransmit_timer_(this), receiver_retransmit_timer_(this),
                 fct_timer_(this), curseq_(1), t_seqno_(1), recv_next_(1),
-                c_seqno_(1), c_recv_next_(1), rtt_(-0.0), c_recv_next_queue_(0),
-                num_c_queue_filled_(0), initial_credit_rate_(0.0),
-                credit_cnt_(0), credit_cnt_timing_(0),
+                c_seqno_(1), c_recv_next_(1), rtt_(-0.0), c_recv_next_queue_(0), //COS
+                num_c_queue_filled_(0), initial_credit_rate_(0.0), //COS
+                credit_cnt_(0), credit_cnt_timing_(0), //COS
 #ifdef XPASS_CFC_BIC
                 bic_target_loss_(0), bic_increase_rate_(0.2), bic_target_rate_(0),
                 bic_prev_credit_rate_(0), bic_s_min_(100000), bic_s_max_(6000000),
@@ -203,6 +203,8 @@ protected:
   // next credit sequence number expected
   seq_t c_recv_next_;
 
+
+  //COS
   // the number of credit queue(s)
   int credit_queue_count_;
   // credit sequence number queue expected (the least bit is for c_recv_next_)
@@ -245,6 +247,7 @@ protected:
   // predefined initial credit rate
   int initial_credit_rate_;
 
+  // COS
   // credit counter
   int credit_cnt_;
   int credit_cnt_timing_;
@@ -262,6 +265,8 @@ protected:
   int max_segment() { return (max_ethernet_size_ - xpass_hdr_size_); }
   int pkt_remaining() { return ceil(datalen_remaining()/(double)max_segment()); }
   double avg_credit_size() { return (min_credit_size_ + max_credit_size_)/2.0; }
+
+  //COS
   void shift_c_seq_queue(int shift) { c_recv_next_queue_ = c_recv_next_queue_ >> shift; }
   int c_seq_queue_item(int index) { return (c_recv_next_queue_ << index) & 0x00000001; }
 
@@ -289,6 +294,7 @@ protected:
 
   void credit_feedback_control();
 
+  //COS
   int randomize_cos(int seqno);
   void cal_c_queue_filled();
 };
