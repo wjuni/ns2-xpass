@@ -46,6 +46,7 @@ void XPassDropTail::updateTokenBucket() {
   token_bucket_clock_ += new_tokens / token_refresh_rate_;
 }
 
+//COS
 // Enqueue when a new packet has arrived.
 void XPassDropTail::enque(Packet* p) {
   if (p == NULL) {
@@ -53,15 +54,16 @@ void XPassDropTail::enque(Packet* p) {
   }
   // parsing headers.
   hdr_cmn* cmnh = hdr_cmn::access(p);
-
+  hdr_xpass *xph = hdr_xpass::access(p);
+  int cos = xph->cos();
   // enqueue packet: store and forward.
   if (cmnh->ptype() == PT_XPASS_CREDIT) {
     // p is credit packet.
-    credit_q_->enque(p);
-    if (credit_q_->byteLength() > credit_q_limit_) {
-      credit_q_->remove(p);
+    credit_q_[cos].enque(p);
+    if (credit_q_[cos].byteLength() > credit_q_limit_) {
+      credit_q_[cos].remove(p);
       drop(p);
-    }
+   }
   }else {
     // p is data packet.
     data_q_->enque(p);
@@ -73,19 +75,21 @@ void XPassDropTail::enque(Packet* p) {
   }
 }
 
+//COS
 // Dequeue the packets.
 // Data has higher priority than credit packets.
 Packet* XPassDropTail::deque() {
   Packet* packet = NULL;
 
   credit_timer_.force_cancel();
+  updateCreditQueue();
   updateTokenBucket();
 
   // Credit packet
-  packet = credit_q_->head();
+  packet = credit_q_[c_queue_num_].head();
   if (packet && tokens_ >= hdr_cmn::access(packet)->size()) {
     // Credit packet should be forwarded.
-    packet = credit_q_->deque();
+    packet = credit_q_[c_queue_num_].deque();
     tokens_ -= hdr_cmn::access(packet)->size();
     return packet;
   }
@@ -102,10 +106,28 @@ Packet* XPassDropTail::deque() {
   if (packet) {
     double delay = (hdr_cmn::access(packet)->size() - tokens_) / token_refresh_rate_;
     credit_timer_.resched(delay);
-  }else if (credit_q_->byteLength() > 0 && data_q_->byteLength() > 0) {
+  }else if (credit_q_[c_queue_num_].byteLength() > 0 && data_q_->byteLength() > 0) {
     fprintf(stderr,"Switch has non-zero queue, but timer was not set.\n");
     exit(1);
   }
 
   return NULL;
+}
+
+//COS
+void XPassDropTail::updateCreditQueue() {
+  double now = Scheduler::instance().clock();
+  double elapsed_time = now - c_queue_clock_;
+
+  if(elapsed_time > 0.00001) {
+    c_queue_num_ = (c_queue_num_+1) % credit_queue_count_;
+    c_queue_clock_ = now;
+  }
+  for(int i=0; i<credit_queue_count_; i++) {
+    if(credit_q_[(c_queue_num_ + i)%credit_queue_count_].length() != 0) {
+      break;
+    }
+    c_queue_num_ = (c_queue_num_+1) % credit_queue_count_;
+    c_queue_clock_ = now;
+  }
 }

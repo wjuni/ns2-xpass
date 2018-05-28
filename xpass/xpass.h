@@ -8,8 +8,18 @@
 #include <assert.h>
 #include <math.h>
 
+// Define one of XPASS_CFC_ORIGINAL, XPASS_CFC_BIC, XPASS_CFC_CUBIC
+#define XPASS_CFC_ORIGINAL
+
+#if !defined(XPASS_CFC_ORIGINAL) && !defined(XPASS_CFC_BIC) && !defined(XPASS_CFC_CUBIC)
+#error Xpass credit feedback control method (XPASS_CFC_X) must be designated.
+#endif
+
+#define CREDIT_BURST_SIZE 16
+
 typedef enum XPASS_SEND_STATE_ {
   XPASS_SEND_CLOSED,
+  XPASS_SEND_CLOSE_WAIT,
   XPASS_SEND_CREDIT_SENDING,
   XPASS_SEND_CREDIT_STOP_RECEIVED,
   XPASS_SEND_NSTATE,
@@ -34,6 +44,9 @@ struct hdr_xpass {
   // temp variables for test
   int sendbuffer_;
 
+  // For CoS Randomization
+  int cos_;
+
   // For header access
   static int offset_; // required by PacketHeaderManager
   inline static hdr_xpass* access(const Packet* p) {
@@ -43,6 +56,8 @@ struct hdr_xpass {
   /* per-field member access functions */
   double& credit_sent_time() { return (credit_sent_time_); }
   seq_t& credit_seq() { return (credit_seq_); }
+
+  int& cos() { return (cos_); }
 };
 
 class XPassAgent;
@@ -78,19 +93,34 @@ protected:
   XPassAgent *a_;
 };
 
+class FCTTimer: public TimerHandler {
+public:
+  FCTTimer(XPassAgent *a): TimerHandler(), a_(a) { }
+protected:
+  virtual void expire(Event *);
+  XPassAgent *a_;
+};
+
 class XPassAgent: public Agent {
   friend class SendCreditTimer;
   friend class CreditStopTimer;
   friend class SenderRetransmitTimer;
   friend class ReceiverRetransmitTimer;
+  friend class FCTTimer;
 public:
   XPassAgent(): Agent(PT_XPASS_DATA), credit_send_state_(XPASS_SEND_CLOSED),
                 credit_recv_state_(XPASS_RECV_CLOSED), last_credit_rate_update_(-0.0),
                 credit_total_(0), credit_dropped_(0), can_increase_w_(false),
                 send_credit_timer_(this), credit_stop_timer_(this), 
                 sender_retransmit_timer_(this), receiver_retransmit_timer_(this),
-                curseq_(1), t_seqno_(1), recv_next_(1),
-                c_seqno_(1), c_recv_next_(1), rtt_(-0.0),
+                fct_timer_(this), curseq_(1), t_seqno_(1), recv_next_(1),
+                c_seqno_(1), c_recv_next_(1), rtt_(-0.0), c_recv_next_queue_(0), //COS
+                num_c_queue_filled_(0), initial_credit_rate_(0.0), //COS
+                credit_cnt_(0), credit_cnt_timing_(0), //COS
+#ifdef XPASS_CFC_BIC
+                bic_target_loss_(0), bic_increase_rate_(0.2), bic_target_rate_(0),
+                bic_prev_credit_rate_(0), bic_s_min_(100000), bic_s_max_(6000000),
+#endif
                 credit_recved_(0), wait_retransmission_(false),
                 credit_wasted_(0), credit_recved_rtt_(0), last_credit_recv_update_(0) { }
   virtual int command(int argc, const char*const* argv);
@@ -108,6 +138,9 @@ protected:
   int min_ethernet_size_;
   // maximum Ethernet frame size (= maximum data packet size)
   int max_ethernet_size_;
+
+  // Experiment ID
+  int exp_id_;
 
   // If min_credit_size_ and max_credit_size_ are the same, 
   // credit size is determined statically. Otherwise, if
@@ -157,6 +190,7 @@ protected:
   CreditStopTimer credit_stop_timer_;
   SenderRetransmitTimer sender_retransmit_timer_;
   ReceiverRetransmitTimer receiver_retransmit_timer_;
+  FCTTimer fct_timer_;
 
   // the highest sequence number produced by app.
   seq_t curseq_;
@@ -169,10 +203,20 @@ protected:
   // next credit sequence number expected
   seq_t c_recv_next_;
 
+
+  //COS
+  // the number of credit queue(s)
+  int credit_queue_count_;
+  // credit sequence number queue expected (the least bit is for c_recv_next_)
+  uint32_t c_recv_next_queue_;
+  // the number of credit sequence numbers received on queue
+  int num_c_queue_filled_;
+
   // weighted-average round trip time
   double rtt_;
   // flow start time
   double fst_;
+  double fct_;
 
   // retransmission time out
   double retransmit_timeout_;
@@ -191,11 +235,40 @@ protected:
   // temp variables
   int credit_wasted_;
 
+  // whether to apply early credit stop
+  int early_credit_stop_;
+
+  // whether to apply dynamic target loss on credit feedback control
+  int dynamic_target_loss_;
+
+  // whether to apply adaptive initial rate
+  int adaptive_initial_rate_; 
+
+  // predefined initial credit rate
+  int initial_credit_rate_;
+
+  // COS
+  // credit counter
+  int credit_cnt_;
+  int credit_cnt_timing_;
+#ifdef XPASS_CFC_BIC
+  double bic_target_loss_;
+  double bic_increase_rate_;
+  int bic_target_rate_;
+  int bic_prev_credit_rate_;
+  int bic_s_min_;
+  int bic_s_max_;
+#endif
+
   inline double now() { return Scheduler::instance().clock(); }
   seq_t datalen_remaining() { return (curseq_ - t_seqno_); }
   int max_segment() { return (max_ethernet_size_ - xpass_hdr_size_); }
   int pkt_remaining() { return ceil(datalen_remaining()/(double)max_segment()); }
   double avg_credit_size() { return (min_credit_size_ + max_credit_size_)/2.0; }
+
+  //COS
+  void shift_c_seq_queue(int shift) { c_recv_next_queue_ = c_recv_next_queue_ >> shift; }
+  int c_seq_queue_item(int index) { return (c_recv_next_queue_ << index) & 0x00000001; }
 
   void init();
   Packet* construct_credit_request();
@@ -215,10 +288,15 @@ protected:
 
   void handle_sender_retransmit();
   void handle_receiver_retransmit();
+  void handle_fct();
   void process_ack(Packet *pkt);
   void update_rtt(Packet *pkt);
 
   void credit_feedback_control();
+
+  //COS
+  int randomize_cos(int seqno);
+  void cal_c_queue_filled();
 };
 
 #endif

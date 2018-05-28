@@ -18,3 +18,7 @@ indep-utils/webtrace-conv/nlanr/nlanr-tr-stat
 indep-utils/webtrace-conv/ucb/ucb-tr-stat
 outputs
 outputs/*
+*.py
+*.json
+tags
+traces/*
