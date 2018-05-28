@@ -717,7 +717,6 @@ void XPassAgent::credit_feedback_control() {
 
   if (loss_rate > target_loss) {
     // congestion has been detected!
-    printf("Congestion detected. dropped credit = %d, credit_total = %d\n", credit_dropped_, credit_total_);
     if (loss_rate >= 1.0) {
       cur_credit_rate_ = (int)(avg_credit_size() / rtt_);
     } else {
@@ -733,7 +732,6 @@ void XPassAgent::credit_feedback_control() {
     can_increase_w_ = false;
   }else {
     // there is no congestion.
-    printf("Congestion not detected. dropped credit = %d, credit_total = %d\n", credit_dropped_, credit_total_);
     if (can_increase_w_) {
       w_ = min(w_ + 0.05, 0.5);
     }else {
