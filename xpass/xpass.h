@@ -268,7 +268,7 @@ protected:
 
   //COS
   void shift_c_seq_queue(int shift) { c_recv_next_queue_ = c_recv_next_queue_ >> shift; }
-  int c_seq_queue_item(int index) { return (c_recv_next_queue_ << index) & 0x00000001; }
+  int c_seq_queue_item(int index) { return c_recv_next_queue_ & (0x00000001 << index); }
 
   void init();
   Packet* construct_credit_request();

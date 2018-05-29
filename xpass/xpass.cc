@@ -320,7 +320,7 @@ void XPassAgent::recv_data(Packet *pkt) {
     seq_t new_c_recv_next = new_seq + 1;
     int jump = new_c_recv_next - c_recv_next_;
     if (jump > CREDIT_BURST_SIZE*2 - 1) {
-      num_dropped = (new_c_recv_next - c_recv_next_ - num_c_queue_filled_);
+      num_dropped = (new_seq - c_recv_next_ - num_c_queue_filled_);
       credit_dropped_ += num_dropped;
       credit_total_ += (num_dropped + 1);
       c_recv_next_ = new_c_recv_next;

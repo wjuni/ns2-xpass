@@ -64,6 +64,7 @@ Queue/XPassDropTail set credit_limit_ $creditQueueCapacity
 Queue/XPassDropTail set data_limit_ $dataQueueCapacity
 Queue/XPassDropTail set token_refresh_rate_ $creditRate
 Queue/XPassDropTail set credit_queue_count_ $creditQueueCount
+Queue/XPassDropTail set max_tokens_ [expr 84*2]
 
 for {set i 0} {$i < $N} {incr i} {
   $ns simplex-link $left_node($i) $left_gateway $inputlinkBW $linkLatency DropTail

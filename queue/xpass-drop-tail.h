@@ -44,7 +44,6 @@ protected:
   void enque(Packet*);
   Packet* deque();
   void updateTokenBucket();
-  void updateCreditQueue();
   void expire();
 
   // Queue Related Varaibles

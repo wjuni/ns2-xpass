@@ -63,7 +63,7 @@ void XPassDropTail::enque(Packet* p) {
     if (credit_q_[cos].byteLength() > credit_q_limit_) {
       credit_q_[cos].remove(p);
       drop(p);
-   }
+    }
   }else {
     // p is data packet.
     data_q_->enque(p);
@@ -82,11 +82,15 @@ Packet* XPassDropTail::deque() {
   Packet* packet = NULL;
 
   credit_timer_.force_cancel();
-  updateCreditQueue();
+  
+  int iter = 0;
+  do {
+    c_queue_num_ = (c_queue_num_+1) % credit_queue_count_;
+    iter++;
+  } while(!(packet = credit_q_[c_queue_num_].head()) && iter < credit_queue_count_);
   updateTokenBucket();
 
   // Credit packet
-  packet = credit_q_[c_queue_num_].head();
   if (packet && tokens_ >= hdr_cmn::access(packet)->size()) {
     // Credit packet should be forwarded.
     packet = credit_q_[c_queue_num_].deque();
@@ -114,20 +118,3 @@ Packet* XPassDropTail::deque() {
   return NULL;
 }
 
-//COS
-void XPassDropTail::updateCreditQueue() {
-  double now = Scheduler::instance().clock();
-  double elapsed_time = now - c_queue_clock_;
-
-  if(elapsed_time > 0.00001) {
-    c_queue_num_ = (c_queue_num_+1) % credit_queue_count_;
-    c_queue_clock_ = now;
-  }
-  for(int i=0; i<credit_queue_count_; i++) {
-    if(credit_q_[(c_queue_num_ + i)%credit_queue_count_].length() != 0) {
-      break;
-    }
-    c_queue_num_ = (c_queue_num_+1) % credit_queue_count_;
-    c_queue_clock_ = now;
-  }
-}
