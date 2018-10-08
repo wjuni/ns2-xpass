@@ -1,4 +1,5 @@
 set ns [new Simulator]
+
 #
 # Flow configurations
 #
@@ -29,7 +30,7 @@ set numNode 192 ;# number of nodes
 #
 # XPass configurations
 #
-set alpha 0.0625
+set alpha 0.5
 set w_init 0.0625
 set creditBuffer [expr 84*8]
 set maxCreditBurst [expr 84*2]
@@ -53,10 +54,13 @@ set simEndTime 60
 
 # Output file
 file mkdir "outputs"
-set nt [open outputs/trace.out w]
-set fct_out [open outputs/fct.out w]
+set nt [open "outputs/trace.out" w]
+set fct_out [open "outputs/fct.out" w]
+set wst_out [open "outputs/waste.out" w]
 puts $fct_out "Flow ID,Flow Size (bytes),Flow Completion Time (secs)"
+puts $wst_out "Flow ID,Flow Size (bytes),Wasted Credit"
 close $fct_out
+close $wst_out
 
 set flowfile [open flowfile.tr w]
 
@@ -93,6 +97,7 @@ $ns rtproto DV
 Agent/rtProto/DV set advertInterval 10
 Node set multiPath_ 1
 Classifier/MultiPath set symmetric_ true
+Classifier/MultiPath set nodetype_ 0
 
 # Workloads setting
 if {[string compare $workload "mining"] == 0} {
@@ -112,7 +117,7 @@ if {[string compare $workload "mining"] == 0} {
   exit 0
 }
 
-set overSubscRatio [expr double($numNode/$numTor)/double($numTor/$numAggr)*1.5]
+set overSubscRatio [expr double($numNode/$numTor)/double($numTor/$numAggr)]
 set lambda [expr ($numNode*$linkRate*1000000000*$linkLoad)/($avgFlowSize*8.0/$maxPayload*$maxEthernetSize)]
 set avgFlowInterval [expr $overSubscRatio/$lambda]
 
@@ -152,15 +157,19 @@ $randomDstNodeId set max_ $numNode
 puts "Creating nodes..."
 for {set i 0} {$i < $numNode} {incr i} {
   set dcNode($i) [$ns node]
+  $dcNode($i) set nodetype_ 1
 }
 for {set i 0} {$i < $numTor} {incr i} {
   set dcTor($i) [$ns node]
+  $dcTor($i) set nodetype_ 2
 }
 for {set i 0} {$i < $numAggr} {incr i} {
   set dcAggr($i) [$ns node]
+  $dcAggr($i) set nodetype_ 3
 }
 for {set i 0} {$i < $numCore} {incr i} {
   set dcCore($i) [$ns node]
+  $dcCore($i) set nodetype_ 4
 }
 
 # Link

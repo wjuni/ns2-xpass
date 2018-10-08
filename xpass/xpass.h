@@ -6,9 +6,11 @@
 #include "tcp.h"
 #include "template.h"
 #include <assert.h>
+#include <math.h>
 
 typedef enum XPASS_SEND_STATE_ {
   XPASS_SEND_CLOSED,
+  XPASS_SEND_CLOSE_WAIT,
   XPASS_SEND_CREDIT_SENDING,
   XPASS_SEND_CREDIT_STOP_RECEIVED,
   XPASS_SEND_NSTATE,
@@ -29,6 +31,9 @@ struct hdr_xpass {
 
   // Credit sequence number
   seq_t credit_seq_;
+
+  // temp variables for test
+  int sendbuffer_;
 
   // For header access
   static int offset_; // required by PacketHeaderManager
@@ -74,20 +79,30 @@ protected:
   XPassAgent *a_;
 };
 
+class FCTTimer: public TimerHandler {
+public:
+  FCTTimer(XPassAgent *a): TimerHandler(), a_(a) { }
+protected:
+  virtual void expire(Event *);
+  XPassAgent *a_;
+};
+
 class XPassAgent: public Agent {
   friend class SendCreditTimer;
   friend class CreditStopTimer;
   friend class SenderRetransmitTimer;
   friend class ReceiverRetransmitTimer;
+  friend class FCTTimer;
 public:
   XPassAgent(): Agent(PT_XPASS_DATA), credit_send_state_(XPASS_SEND_CLOSED),
                 credit_recv_state_(XPASS_RECV_CLOSED), last_credit_rate_update_(-0.0),
                 credit_total_(0), credit_dropped_(0), can_increase_w_(false),
                 send_credit_timer_(this), credit_stop_timer_(this), 
                 sender_retransmit_timer_(this), receiver_retransmit_timer_(this),
-                curseq_(1), t_seqno_(1), recv_next_(1),
+                fct_timer_(this), curseq_(1), t_seqno_(1), recv_next_(1),
                 c_seqno_(1), c_recv_next_(1), rtt_(-0.0),
-                credit_recved_(0), wait_retransmission_(false) { }
+                credit_recved_(0), wait_retransmission_(false),
+                credit_wasted_(0), credit_recved_rtt_(0), last_credit_recv_update_(0) { }
   virtual int command(int argc, const char*const* argv);
   virtual void recv(Packet*, Handler*);
 protected:
@@ -152,6 +167,7 @@ protected:
   CreditStopTimer credit_stop_timer_;
   SenderRetransmitTimer sender_retransmit_timer_;
   ReceiverRetransmitTimer receiver_retransmit_timer_;
+  FCTTimer fct_timer_;
 
   // the highest sequence number produced by app.
   seq_t curseq_;
@@ -168,6 +184,7 @@ protected:
   double rtt_;
   // flow start time
   double fst_;
+  double fct_;
 
   // retransmission time out
   double retransmit_timeout_;
@@ -177,12 +194,19 @@ protected:
 
   // counter to hold credit count;
   int credit_recved_;
+  int credit_recved_rtt_;
+  double last_credit_recv_update_;
 
   // whether receiver is waiting for data retransmission
   bool wait_retransmission_;
 
+  // temp variables
+  int credit_wasted_;
+
   inline double now() { return Scheduler::instance().clock(); }
   seq_t datalen_remaining() { return (curseq_ - t_seqno_); }
+  int max_segment() { return (max_ethernet_size_ - xpass_hdr_size_); }
+  int pkt_remaining() { return ceil(datalen_remaining()/(double)max_segment()); }
   double avg_credit_size() { return (min_credit_size_ + max_credit_size_)/2.0; }
 
   void init();
@@ -203,6 +227,7 @@ protected:
 
   void handle_sender_retransmit();
   void handle_receiver_retransmit();
+  void handle_fct();
   void process_ack(Packet *pkt);
   void update_rtt(Packet *pkt);
 
