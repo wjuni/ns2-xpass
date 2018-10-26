@@ -120,12 +120,16 @@ public:
         	last_send_time_(-1.0), infinite_send_(FALSE), irs_(-1),
         	delack_timer_(this), flags_(0),
         	state_(TCPS_CLOSED), recent_ce_(FALSE),
-        	last_state_(TCPS_CLOSED), rq_(rcv_nxt_), last_ack_sent_(-1) { }
+        	last_state_(TCPS_CLOSED), rq_(rcv_nxt_),  
+		last_ack_sent_(-1), dctcp_total(0), dctcp_marked(0), 
+		dctcp_alpha_update_seq(0), 
+	        dctcp_maxseq(0), ce_transition(0),num_rtx_(0)  { }
 
 	~FullTcpAgent() { cancel_timers(); rq_.clear(); }
 	virtual void recv(Packet *pkt, Handler*);
 	virtual void timeout(int tno); 	// tcp_timers() in real code
 	virtual void close() { usrclosed(); }
+//void send(Packet* p, Handler* h);
 	void advanceby(int);	// over-rides tcp base version
 	void advance_bytes(seq_t);	// unique to full-tcp
         virtual void sendmsg(int nbytes, const char *flags = 0);
@@ -148,6 +152,12 @@ protected:
 	int deflate_on_pack_;	// deflate on partial acks (reno:yes)
 	int data_on_syn_;   // send data on initial SYN?
 	double last_send_time_;	// time of last send
+	double last_rtt_time_;
+
+	double fst_;
+
+	int real_ndatapkts;
+
 	int close_on_empty_;	// close conn when buffer empty
 	int signal_on_empty_;	// signal when buffer is empty
 	int reno_fastrecov_;	// do reno-style fast recovery?
@@ -183,6 +193,8 @@ protected:
 	void finish();
 	void reset_rtx_timer(int);  	// adjust the rtx timer
 
+	void update_dctcp_alpha(Packet*); // DCTCP alpha update
+
 	virtual void timeout_action();	// what to do on rtx timeout
 	virtual void dupack_action();	// what to do on dup acks
 	virtual void pack_action(Packet*);	// action on partial acks
@@ -199,7 +211,7 @@ protected:
 		if (seq == t_seqno_)
 			t_seqno_ += amt;
 		pipe_ += amt;
-		if (seq < int(maxseq_))
+		if (seq < maxseq_)
 			rtxbytes_ += amt;
 	}
 	virtual void oldack() {			// what to do on old ack
@@ -236,18 +248,32 @@ protected:
 	int last_state_; /* FSM state at last pkt recv */
 	seq_t rcv_nxt_;       /* next sequence number expected */
 	ReassemblyQueue rq_;    /* TCP reassembly queue */
+	
 	/*
 	* the following are part of a tcpcb in "real" RFC1323 TCP
 	*/
-	int last_ack_sent_; /* ackno field from last segment we sent */
+	seq_t last_ack_sent_; /* ackno field from last segment we sent */
 	double recent_;		// ts on SYN written by peer
 	double recent_age_;	// my time when recent_ was set
 
+	/*
+	 * variables for DCTCP
+	 */
+	seq_t dctcp_total;
+	seq_t dctcp_marked;
+	seq_t dctcp_alpha_update_seq;
+	seq_t dctcp_maxseq;
+	int ce_transition;
+
+	
 	/*
 	 * setting iw, specific to tcp-full, called
 	 * by TcpAgent::reset()
 	 */
 	void set_initial_window();
+	int num_rtx_;	
+
+
 };
 
 class NewRenoFullTcpAgent : public FullTcpAgent {

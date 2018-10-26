@@ -99,6 +99,7 @@ Queue/FQ set secsPerByte_ 0
 # change DropTail to RED for RED on individual queues
 FQLink set queueManagement_ DropTail
 
+
 Queue/DropTail set drop_front_ false
 Queue/DropTail set summarystats_ false
 Queue/DropTail set queue_in_bytes_ false
@@ -1036,6 +1037,11 @@ Agent/TCP set control_increase_ 0
 Agent/TCP set SetCWRonRetransmit_ true ; # added on 2005/06/19.
 				 	 # default changed on 2008/06/05. 
 
+# DCTCP
+Agent/TCP set dctcp_ false;
+Agent/TCP set dctcp_alpha_ 0.0;
+Agent/TCP set dctcp_g_ 0.0625;
+
 # XXX Generate nam trace or plain old text trace for variables. 
 # When it's true, generate nam trace.
 Agent/TCP set nam_tracevar_ false
@@ -1613,3 +1619,48 @@ Agent/XPass set min_w_ 0.01
 Agent/XPass set retransmit_timeout_ 0.1 ;# 100ms
 Agent/XPass set min_jitter_ -0.1
 Agent/XPass set max_jitter_ 0.1
+Agent/XPass set exp_id_ 0
+Agent/XPass set bic_s_min_ 100000
+Agent/XPass set bic_s_max_ 6000000
+Agent/XPass set bic_beta_ 2
+Agent/XPass set cur_credit_rate_tr_ 0
+
+Queue/XPassRED set bytes_ true ;		# default changed on 10/11/2004.
+Queue/XPassRED set queue_in_bytes_ true ;	# default changed on 10/11/2004.
+Queue/XPassRED set thresh_ 0
+Queue/XPassRED set maxthresh_ 0
+Queue/XPassRED set thresh_queue_ [Queue set limit_]
+Queue/XPassRED set maxthresh_queue_ [Queue set limit_]
+Queue/XPassRED set mean_pktsize_ 500
+Queue/XPassRED set idle_pktsize_ 100
+Queue/XPassRED set q_weight_ -1
+Queue/XPassRED set wait_ true
+Queue/XPassRED set linterm_ 10
+Queue/XPassRED set mark_p_ 0.1
+Queue/XPassRED set use_mark_p_ true
+Queue/XPassRED set setbit_ false
+Queue/XPassRED set gentle_ true
+Queue/XPassRED set drop_tail_ true
+Queue/XPassRED set drop_front_ false
+Queue/XPassRED set drop_rand_ false
+Queue/XPassRED set doubleq_ false
+Queue/XPassRED set ns1_compat_ false
+Queue/XPassRED set dqthresh_ 50
+Queue/XPassRED set ave_ 0.0
+Queue/XPassRED set prob1_ 0.0
+Queue/XPassRED set curq_ 0
+Queue/XPassRED set cur_max_p_ 0
+Queue/XPassRED set summarystats_ false
+Queue/XPassRED set alpha_ 0.01
+Queue/XPassRED set beta_ 0.9 
+Queue/XPassRED set adaptive_ 0
+Queue/XPassRED set interval_ 0.5
+Queue/XPassRED set targetdelay_ 0.005
+Queue/XPassRED set top_ 0.5
+Queue/XPassRED set bottom_ 0
+Queue/XPassRED set cautious_ 0
+Queue/XPassRED set feng_adaptive_ 0
+Queue/XPassRED set qidx_ 0
+Queue/XPassRED set exp_id_ 0
+Queue/XPassRED set trace_ 0
+
